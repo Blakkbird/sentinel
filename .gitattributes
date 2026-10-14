@@ -1,0 +1,7 @@
+# Line endings. Scripts that run on Linux (CI) must keep Unix line endings even when
+# committed from Windows, otherwise ./mvnw fails with a confusing "bad interpreter"
+# error. Windows batch files get Windows line endings.
+*        text=auto
+*.sh     text eol=lf
+mvnw     text eol=lf
+*.cmd    text eol=crlf

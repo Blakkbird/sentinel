@@ -1,0 +1,43 @@
+# Optional: run Postgres and Redis in Docker instead of installing them. From the repo root:
+#
+#   docker compose -f ops/docker-compose.yml up -d                                start Postgres + Redis
+#   docker compose -f ops/docker-compose.yml down                                 stop everything (data kept)
+#   docker compose -f ops/docker-compose.yml down -v                              stop and wipe the database
+#
+# The Spring app itself runs outside Docker, from your IDE or ./mvnw, so you can debug it.
+
+name: sentinel
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentinel-postgres
+    environment:
+      POSTGRES_DB: sentinel
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel-redis
+    # counters are rebuilt by live traffic, so there is nothing worth saving to disk
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

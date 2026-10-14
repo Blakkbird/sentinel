@@ -1,0 +1,53 @@
+# Settings Spring Boot reads at startup. Any key can be overridden with an environment
+# variable: upper case, dots and dashes become underscores
+# (spring.datasource.url -> SPRING_DATASOURCE_URL).
+
+spring:
+  application:
+    name: sentinel
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/sentinel
+    username: sentinel
+    password: sentinel
+    hikari:
+      maximum-pool-size: 10      # more connections is usually slower, not faster
+      connection-timeout: 2000   # ms to wait for a free connection before giving up
+
+  flyway:
+    enabled: true                # applies db/migration/*.sql on startup, in order
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 50ms              # hard cap per Redis command; a slow Redis must not eat the latency budget
+      connect-timeout: 200ms
+
+  threads:
+    virtual:
+      enabled: false             # stage 6 experiment: set true, re-run the load test, compare
+
+server:
+  shutdown: graceful             # on stop, finish in-flight decisions before exiting
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true            # adds /actuator/health/liveness and /actuator/health/readiness
+      group:
+        readiness:
+          # "Can this instance take traffic?" depends only on Postgres. Without Redis we
+          # still decide (degraded mode), so a Redis outage must not pull us out of service.
+          # /actuator/health still reports Redis, so the outage stays visible.
+          include: readinessState,db
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html       # a web page for trying the API from the browser

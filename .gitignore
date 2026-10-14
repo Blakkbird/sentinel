@@ -1,0 +1,26 @@
+# build output
+target/
+*.class
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# frontend (stage 5)
+node_modules/
+dist/
+
+# secrets never go in git
+.env
+*.env.local

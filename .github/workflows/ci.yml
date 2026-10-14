@@ -1,0 +1,32 @@
+# Continuous integration: GitHub runs this on every push to main and on every pull
+# request. Turn on branch protection (Settings > Branches) so a pull request cannot be
+# merged unless this passes. That one setting keeps main working for all three of you.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven            # reuse downloaded libraries between runs
+
+      # "verify" compiles, runs every test, and packages the app. The integration tests
+      # start their own Postgres and Redis containers; GitHub's runners have Docker.
+      # chmod: a file committed from Windows can lose its "executable" flag.
+      - name: Build and test
+        run: |
+          chmod +x mvnw
+          ./mvnw -B verify
