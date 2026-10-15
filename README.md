@@ -13,7 +13,7 @@ Applications · TIET
 
 - A fraud check sits beside every card payment and has to answer in a few milliseconds.
 - Sentinel keeps fast counters of recent activity in **Redis** (for example "this card was used 6 times
-  this minute"), runs a set of **rules** over them, and stores every decision in **PostgreSQL**.
+  this minute") runs a set of **rules** over them, and stores every decision in **PostgreSQL**.
 - Each stored decision keeps the facts the rules saw and what each rule did. So any decision can be
   explained later, and a rule change can be tested against past decisions before it goes live.
 
