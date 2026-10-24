@@ -215,6 +215,9 @@ Payment systems call `/v1` with an `X-Api-Key` header. The console calls `/api` 
 | GET | `/v1/features` | Every fact a rule can use |
 | POST | `/api/auth/login`, `/api/auth/logout` | Sign in and out of the console (session cookie) |
 | GET | `/api/auth/me` | Who is signed in |
+| GET | `/api/decisions` | Search decisions: `q` (any id), `outcome`, `degraded`, `shadowChanges`, `cursor`, `limit` |
+| GET | `/api/decisions/{transactionId}` | One decision, explained rule by rule |
+| GET | `/api/stream/decisions` | Live feed of new decisions (Server-Sent Events) |
 | GET | `/actuator/health` | Health of the app, Postgres and Redis (other actuator endpoints: admins only) |
 
 ## Working together

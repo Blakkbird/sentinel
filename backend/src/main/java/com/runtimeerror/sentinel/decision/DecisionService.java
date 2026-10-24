@@ -11,6 +11,7 @@ import com.runtimeerror.sentinel.rules.ActiveRuleSet;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,7 @@ import java.util.concurrent.TimeUnit;
  *   3. take the current rule set, once
  *   4. evaluate: pure computation, no I/O
  *   5. write the decision to the log, and only then answer
+ *   6. announce it (DecisionRecorded), which feeds the console's live view
  *
  * Step 5 is the promise the whole system is built around: Sentinel never gives an
  * answer it has not recorded. If the database is down we return 503 and make no
@@ -44,17 +46,19 @@ public class DecisionService {
     private final DecisionLog log;
     private final Clock clock;
     private final MeterRegistry meters;
+    private final ApplicationEventPublisher events;
     private final Timer latency;
     private final Map<Outcome, Counter> outcomeCounters = new EnumMap<>(Outcome.class);
 
     public DecisionService(FeatureAssembler assembler, ActiveRuleSet ruleSets, DecisionEngine engine,
-                           DecisionLog log, Clock clock, MeterRegistry meters) {
+                           DecisionLog log, Clock clock, MeterRegistry meters, ApplicationEventPublisher events) {
         this.assembler = assembler;
         this.ruleSets = ruleSets;
         this.engine = engine;
         this.log = log;
         this.clock = clock;
         this.meters = meters;
+        this.events = events;
         this.latency = Timer.builder("sentinel.decision.latency")
                 .description("Time to decide one transaction, including the durable write")
                 .publishPercentileHistogram()
@@ -136,6 +140,10 @@ public class DecisionService {
         }
 
         outcomeCounters.get(verdict.outcome()).increment();
+
+        // 6. Tell whoever is listening. The live feed hands the work to its own thread at
+        //    once, so this costs the decision next to nothing.
+        events.publishEvent(new DecisionRecorded(decision));
         return decision;
     }
 }

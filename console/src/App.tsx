@@ -5,6 +5,9 @@ import { meQueryKey } from "@/auth/useAuth";
 import { RequireAuth } from "@/auth/RequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { LoginPage } from "@/pages/LoginPage";
+import { LivePage } from "@/pages/LivePage";
+import { DecisionsPage } from "@/pages/DecisionsPage";
+import { DecisionDetailPage } from "@/pages/DecisionDetailPage";
 import { RulesPage } from "@/pages/RulesPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
@@ -40,7 +43,10 @@ export function App() {
               </RequireAuth>
             }
           >
-            <Route index element={<Navigate to="/rules" replace />} />
+            <Route index element={<Navigate to="/live" replace />} />
+            <Route path="/live" element={<LivePage />} />
+            <Route path="/decisions" element={<DecisionsPage />} />
+            <Route path="/decisions/:transactionId" element={<DecisionDetailPage />} />
             <Route path="/rules" element={<RulesPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

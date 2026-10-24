@@ -4,6 +4,7 @@ import com.runtimeerror.sentinel.engine.RuleSet;
 import com.runtimeerror.sentinel.features.Features;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -34,6 +35,15 @@ public class ActiveRuleSet {
 
     public RuleSet current() {
         return current.get();
+    }
+
+    /**
+     * The rule set with this version number, if this application has it. Today that is only
+     * the version in force; from Sprint 2, every published version lives in the database.
+     */
+    public Optional<RuleSet> find(int version) {
+        RuleSet now = current.get();
+        return now.version() == version ? Optional.of(now) : Optional.empty();
     }
 
     /** Stage 3: called after a publish or a rollback. */
