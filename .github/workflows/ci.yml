@@ -30,3 +30,22 @@ jobs:
         run: |
           chmod +x mvnw
           ./mvnw -B verify
+
+  console:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: console
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+
+      # npm ci installs exactly what package-lock.json lists. "build" type-checks every
+      # file with TypeScript, then bundles the app, so a type error fails the pull request.
+      - run: npm ci
+      - run: npm run build
