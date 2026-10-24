@@ -48,6 +48,32 @@ class FeatureAssemblerTest {
         FeatureVector features = assembler.assemble("card-1", " ", 100_00, now);
 
         assertThat(features.has(Features.DEVICE_COUNT_1H)).isFalse();
+        assertThat(features.has(Features.DEVICE_DISTINCT_CARDS_1H)).isFalse();
+        assertThat(features.has(Features.CARD_NEW_DEVICE)).isFalse();
+        assertThat(features.has(Features.CARD_KNOWN_DEVICES)).isFalse();
+    }
+
+    @Test
+    void countsTheDifferentCardsADeviceHasTried() {
+        assembler.assemble("card-1", "dev-1", 100_00, now);
+        assembler.assemble("card-2", "dev-1", 100_00, now);
+        assembler.assemble("card-2", "dev-1", 100_00, now);   // a repeat card does not count twice
+        FeatureVector fourth = assembler.assemble("card-3", "dev-1", 100_00, now);
+
+        assertThat(fourth.get(Features.DEVICE_DISTINCT_CARDS_1H)).isEqualTo(3);
+    }
+
+    @Test
+    void flagsTheFirstTimeACardIsSeenOnADevice() {
+        FeatureVector first = assembler.assemble("card-1", "dev-1", 100_00, now);
+        FeatureVector again = assembler.assemble("card-1", "dev-1", 100_00, now);
+        FeatureVector elsewhere = assembler.assemble("card-1", "dev-2", 100_00, now);
+
+        assertThat(first.get(Features.CARD_NEW_DEVICE)).isEqualTo(1);
+        assertThat(first.get(Features.CARD_KNOWN_DEVICES)).isEqualTo(1);
+        assertThat(again.get(Features.CARD_NEW_DEVICE)).isEqualTo(0);
+        assertThat(elsewhere.get(Features.CARD_NEW_DEVICE)).isEqualTo(1);
+        assertThat(elsewhere.get(Features.CARD_KNOWN_DEVICES)).isEqualTo(2);
     }
 
     @Test

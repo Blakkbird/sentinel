@@ -3,7 +3,9 @@ package com.runtimeerror.sentinel.features;
 import java.time.Instant;
 
 /**
- * Rolling activity counters per entity (a card, a device, later a merchant).
+ * Rolling activity counters per entity (a card, a device, later a merchant), plus two
+ * kinds of memory: "how many different X has this entity used lately?" and "has this
+ * entity been seen with this X before?".
  *
  * This is an interface on purpose. The real implementation talks to Redis. Tests use an
  * in-memory version instead, so feature and rule tests need nothing running and finish
@@ -30,9 +32,40 @@ public interface VelocityStore {
     record Window(long count, long amountMinor) {
     }
 
+    /** Distinct values are counted in ten-minute buckets; six of them make the last hour. */
+    int DISTINCT_BUCKET_MINUTES = 10;
+    int DISTINCT_BUCKETS = 6;
+
+    /**
+     * Adds value to this entity's distinct set for the current ten-minute bucket, then
+     * returns roughly how many different values the entity has used in the last hour,
+     * including this one.
+     *
+     *   addDistinct("device", "dev-7", "card", "card-42", now)
+     *   -> how many different cards has dev-7 tried lately?
+     */
+    long addDistinct(String entityType, String entityId, String dimension, String value, Instant at);
+
+    /**
+     * Remembers that value was seen with this entity, for 30 days after the latest sighting,
+     * and says whether it was new and how many different values are now known.
+     *
+     *   addMember("card", "card-42", "device", "dev-7")
+     *   -> is dev-7 a new device for card-42, and how many devices has the card used?
+     */
+    Membership addMember(String entityType, String entityId, String dimension, String value);
+
+    record Membership(boolean isNew, long size) {
+    }
+
     /** Which one-minute bucket an instant falls into: minutes since 1 January 1970. */
     static long minuteBucket(Instant at) {
         return Math.floorDiv(at.getEpochSecond(), 60);
+    }
+
+    /** Which ten-minute bucket an instant falls into. */
+    static long tenMinuteBucket(Instant at) {
+        return Math.floorDiv(at.getEpochSecond(), DISTINCT_BUCKET_MINUTES * 60L);
     }
 
     /** Checks the requested windows and returns the longest one. */

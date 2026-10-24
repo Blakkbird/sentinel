@@ -17,15 +17,19 @@ Applications · TIET
 - Each stored decision keeps the facts the rules saw and what each rule did. So any decision can be
   explained later, and a rule change can be tested against past decisions before it goes live.
 
-## What works today (the starter)
+## What works today
 
-- `POST /v1/decisions` decides a payment. Sending the same `transactionId` again returns the same decision.
-- `GET /v1/decisions/{transactionId}` shows the stored explanation.
-- Six starter rules: large amounts, card velocity, card spend, device velocity, one rule in "shadow
-  mode" (recorded but not applied), and a fallback for when Redis is down.
-- Keeps deciding in "degraded mode" if Redis is unavailable; refuses (503) if the database is down.
-- Unit tests and an end-to-end test, run by GitHub Actions on every push and pull request.
-- `simulator/traffic.py` sends a scripted story of payments, including a card-testing attack.
+- `POST /v1/decisions` decides a payment. Callers authenticate with an API key in `X-Api-Key`. Sending
+  the same `transactionId` again returns the same decision.
+- Eight rules over fast Redis signals: card velocity, card spend, device velocity, how many different
+  cards a device has tried (a HyperLogLog), and whether a card is on a new device. Two rules run in
+  "shadow mode" (recorded, never applied) and one is the fallback for when Redis is down.
+- Keeps deciding in degraded mode if Redis is unavailable; refuses (503) if the database is down.
+- A web console: sign-in with roles, a live feed with a decision tape, search across every decision,
+  and a page that explains any decision rule by rule, with the exact facts the rules saw.
+- `simulator/traffic.py` sends ordinary traffic and three attacks: card testing, card enumeration and
+  account takeover.
+- Unit and integration tests, run by GitHub Actions on every push and pull request.
 
 ## Plan
 
@@ -158,6 +162,7 @@ environment variables in brackets before deploying anywhere.
 
   `amountMinor` is in paise, so 150000 is Rs 1,500.
 - **Simulator**, from the repo root: `python simulator/traffic.py` (Windows: `py simulator\traffic.py`).
+  Add `normal`, `card-testing`, `enumeration` or `takeover` for the other scenarios (see `simulator/README.md`).
 - **Health check:** http://localhost:8080/actuator/health
 
 ### Troubleshooting

@@ -50,6 +50,17 @@ public class FeatureAssembler {
             if (hasDevice) {
                 VelocityStore.Window[] device = velocity.read(DEVICE, deviceId, now, 60);
                 features.put(Features.DEVICE_COUNT_1H, device[0].count());
+
+                // How many different cards has this device tried lately? A bot working through
+                // a list of stolen card numbers uses one device and many cards.
+                features.put(Features.DEVICE_DISTINCT_CARDS_1H,
+                        velocity.addDistinct(DEVICE, deviceId, CARD, cardId, now));
+
+                // Has this card been used on this device before? A new device on a card that
+                // already has a usual one is a classic sign of account takeover.
+                VelocityStore.Membership seen = velocity.addMember(CARD, cardId, DEVICE, deviceId);
+                features.put(Features.CARD_NEW_DEVICE, seen.isNew() ? 1 : 0);
+                features.put(Features.CARD_KNOWN_DEVICES, seen.size());
             }
             return features.build();
 
