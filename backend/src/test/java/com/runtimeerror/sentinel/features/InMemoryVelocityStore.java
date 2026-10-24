@@ -1,7 +1,9 @@
 package com.runtimeerror.sentinel.features;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -15,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InMemoryVelocityStore implements VelocityStore {
 
     private final Map<String, long[]> buckets = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> distinct = new ConcurrentHashMap<>();
+    private final Map<String, Set<String>> members = new ConcurrentHashMap<>();
     private volatile boolean available = true;
 
     /** Simulates an outage. */
@@ -49,6 +53,29 @@ public class InMemoryVelocityStore implements VelocityStore {
             windows[w] = new Window(countUpTo[windowMinutes[w]], amountUpTo[windowMinutes[w]]);
         }
         return windows;
+    }
+
+    @Override
+    public long addDistinct(String entityType, String entityId, String dimension, String value, Instant at) {
+        requireAvailable();
+        String entity = entityType + ":" + dimension;
+        long bucket = VelocityStore.tenMinuteBucket(at);
+        distinct.computeIfAbsent(key(entity, entityId, bucket), k -> ConcurrentHashMap.newKeySet()).add(value);
+
+        Set<String> lastHour = new HashSet<>();
+        for (int i = 0; i < DISTINCT_BUCKETS; i++) {
+            lastHour.addAll(distinct.getOrDefault(key(entity, entityId, bucket - i), Set.of()));
+        }
+        return lastHour.size();   // exact, where Redis is approximate; at test sizes they agree
+    }
+
+    @Override
+    public Membership addMember(String entityType, String entityId, String dimension, String value) {
+        requireAvailable();
+        Set<String> seen = members.computeIfAbsent(entityType + ":" + entityId + ":" + dimension,
+                k -> ConcurrentHashMap.newKeySet());
+        boolean isNew = seen.add(value);
+        return new Membership(isNew, seen.size());
     }
 
     private void requireAvailable() {

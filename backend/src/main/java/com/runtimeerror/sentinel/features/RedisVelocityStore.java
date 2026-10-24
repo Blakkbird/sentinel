@@ -34,6 +34,8 @@ import java.util.List;
 public class RedisVelocityStore implements VelocityStore {
 
     private static final Duration BUCKET_TTL = Duration.ofMinutes(MAX_WINDOW_MINUTES + 10);
+    private static final Duration DISTINCT_TTL = Duration.ofMinutes(DISTINCT_BUCKETS * DISTINCT_BUCKET_MINUTES + 10);
+    private static final Duration MEMBER_TTL = Duration.ofDays(30);
 
     private final StringRedisTemplate redis;
 
@@ -100,6 +102,46 @@ public class RedisVelocityStore implements VelocityStore {
             windows[w] = new Window(countUpTo[windowMinutes[w]], amountUpTo[windowMinutes[w]]);
         }
         return windows;
+    }
+
+    @Override
+    public long addDistinct(String entityType, String entityId, String dimension, String value, Instant at) {
+        long bucket = VelocityStore.tenMinuteBucket(at);
+        String current = distinctKey(entityType, entityId, dimension, bucket);
+        String[] lastHour = new String[DISTINCT_BUCKETS];
+        for (int i = 0; i < DISTINCT_BUCKETS; i++) {
+            lastHour[i] = distinctKey(entityType, entityId, dimension, bucket - i);
+        }
+        try {
+            // PFADD answers 1 when the sketch changed, which always happens when the key was
+            // just created: that is the moment to give it an expiry (same idea as bump()).
+            Long changed = redis.opsForHyperLogLog().add(current, value);
+            if (changed != null && changed == 1L) {
+                redis.expire(current, DISTINCT_TTL);
+            }
+            // PFCOUNT over several keys counts their union: distinct values across the hour.
+            Long count = redis.opsForHyperLogLog().size(lastHour);
+            return count == null ? 0 : count;
+        } catch (RuntimeException e) {
+            throw new VelocityUnavailableException("could not count distinct " + dimension + " for " + entityType, e);
+        }
+    }
+
+    @Override
+    public Membership addMember(String entityType, String entityId, String dimension, String value) {
+        String key = "m:" + entityType + ":" + entityId + ":" + dimension;
+        try {
+            Long added = redis.opsForSet().add(key, value);
+            redis.expire(key, MEMBER_TTL);   // every sighting restarts the 30 days
+            Long size = redis.opsForSet().size(key);
+            return new Membership(added != null && added > 0, size == null ? 0 : size);
+        } catch (RuntimeException e) {
+            throw new VelocityUnavailableException("could not record " + dimension + " for " + entityType, e);
+        }
+    }
+
+    private static String distinctKey(String entityType, String entityId, String dimension, long bucket) {
+        return "d:" + entityType + ":" + entityId + ":" + dimension + ":" + bucket;
     }
 
     private static long parse(String value) {

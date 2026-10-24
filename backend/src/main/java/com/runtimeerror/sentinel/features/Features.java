@@ -21,6 +21,9 @@ public final class Features {
     public static final String CARD_COUNT_1H = "card.txnCount.1h";
     public static final String CARD_AMOUNT_1H = "card.amountSum.1h";
     public static final String DEVICE_COUNT_1H = "device.txnCount.1h";
+    public static final String DEVICE_DISTINCT_CARDS_1H = "device.distinctCards.1h";
+    public static final String CARD_NEW_DEVICE = "card.newDevice";
+    public static final String CARD_KNOWN_DEVICES = "card.knownDevices";
 
     public static final FeatureCatalogue CATALOGUE = FeatureCatalogue.of(
             new FeatureSpec(TXN_AMOUNT_MINOR,
@@ -34,7 +37,15 @@ public final class Features {
             new FeatureSpec(CARD_AMOUNT_1H,
                     "Total amount attempted on this card in the last 60 one-minute buckets, in paise, including this one"),
             new FeatureSpec(DEVICE_COUNT_1H,
-                    "Attempts from this device in the last 60 one-minute buckets, including this one. Absent when no device id is sent")
+                    "Attempts from this device in the last 60 one-minute buckets, including this one. Absent when no device id is sent"),
+            new FeatureSpec(DEVICE_DISTINCT_CARDS_1H,
+                    "Different cards used on this device in the last six ten-minute buckets (50 to 60 minutes), including this"
+                            + " one. Approximate: counted with a HyperLogLog. Absent when no device id is sent"),
+            new FeatureSpec(CARD_NEW_DEVICE,
+                    "1 the first time this card is seen on this device, otherwise 0. Absent when no device id is sent"),
+            new FeatureSpec(CARD_KNOWN_DEVICES,
+                    "Different devices this card has been used from, including this one. Forgotten after 30 days without"
+                            + " use. Absent when no device id is sent")
     );
 
     private Features() {
