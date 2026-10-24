@@ -1,0 +1,20 @@
+# Extra settings for running against Neon, Postgres hosted in the cloud.
+#
+# Turn this file on with the "neon" profile, and pass the connection details as
+# environment variables. They hold a password, so they never go in a committed file:
+#
+#   SPRING_PROFILES_ACTIVE      neon
+#   SPRING_DATASOURCE_URL       jdbc:postgresql://<host from Neon>/<database>?sslmode=require
+#   SPRING_DATASOURCE_USERNAME  the role from the Neon connection string
+#   SPRING_DATASOURCE_PASSWORD  its password
+#
+# Why these numbers: on Neon's free plan the database pauses after 5 minutes with no
+# queries and wakes on the next connection, and running time is the monthly quota.
+# A pool that keeps 10 connections open forever would keep waking it up.
+
+spring:
+  datasource:
+    hikari:
+      minimum-idle: 0            # let the pool empty out when nothing is happening
+      idle-timeout: 60000        # close a connection after 60 s without use (ms)
+      connection-timeout: 15000  # a paused database can take a few seconds to wake (ms)
