@@ -3,6 +3,7 @@ Sends a small, scripted story of payments to a running Sentinel and prints what 
 
     python simulator/traffic.py                 # app on http://localhost:8080
     python simulator/traffic.py --url http://localhost:9090
+    python simulator/traffic.py --api-key KEY   # or set SENTINEL_API_KEY; local default: dev-sentinel-key
 
 The story:
   1. five ordinary payments from five different customers     -> all APPROVE
@@ -16,6 +17,7 @@ Stage 2 grows this into the full adversarial simulator (see simulator/README.md)
 
 import argparse
 import json
+import os
 import random
 import sys
 import time
@@ -29,11 +31,14 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+API_KEY = os.environ.get("SENTINEL_API_KEY", "dev-sentinel-key")
+
+
 def call(method, url, body=None):
     """Makes one HTTP call. Returns (status, parsed JSON or None, milliseconds taken)."""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method,
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json", "X-Api-Key": API_KEY})
     start = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -62,6 +67,8 @@ def decide(base, label, txn, card, device, rupees, merchant="mer-demo"):
     if status != 200:
         title = (resp or {}).get("title", "")
         print(f"  {label:<24} Rs {rupees:>8,}   HTTP {status} {title}")
+        if status == 401:
+            print("  (the API key was refused: pass --api-key or set SENTINEL_API_KEY)")
         return None
     reasons = ", ".join(resp["reasonCodes"]) or "-"
     flag = "   (degraded)" if resp["degraded"] else ""
@@ -86,8 +93,12 @@ def wait_for_quiet_moment():
 def main():
     parser = argparse.ArgumentParser(description="Send a scripted story of payments to Sentinel.")
     parser.add_argument("--url", default="http://localhost:8080", help="where the app is running")
+    parser.add_argument("--api-key", default=None, help="API key (default: SENTINEL_API_KEY, else dev-sentinel-key)")
     args = parser.parse_args()
     base = args.url.rstrip("/")
+    global API_KEY
+    if args.api_key:
+        API_KEY = args.api_key
 
     # A fresh suffix per run, so running the script twice gives fresh decisions rather
     # than the stored answers to the same transaction ids (that is idempotency at work).
@@ -136,10 +147,12 @@ def main():
               f" card.txnCount.1m = {count_text}, rules fired: {', '.join(fired) or 'none'}")
 
     print("\n  Try next:")
-    print("    - docker stop sentinel-redis, run this again: every decision is 'degraded',")
-    print("      the burst is no longer caught, and big payments are stepped up by DEGRADED_FALLBACK.")
-    print("      That is the trade-off of degraded mode, made visible. docker start sentinel-redis after.")
-    print("    - open http://localhost:8080/swagger-ui.html and look up any transaction id above.\n")
+    print("    - in the Ubuntu window: sudo service redis-server stop, then run this again. Every decision")
+    print("      is 'degraded', the burst is no longer caught, and big payments are stepped up by")
+    print("      DEGRADED_FALLBACK. That is the trade-off of degraded mode, made visible.")
+    print("      sudo service redis-server start afterwards.")
+    print("    - open http://localhost:8080/swagger-ui.html, click Authorize, paste the API key,")
+    print("      and look up any transaction id above.\n")
 
 
 if __name__ == "__main__":

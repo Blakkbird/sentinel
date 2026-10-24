@@ -7,6 +7,7 @@ import com.runtimeerror.sentinel.engine.Outcome;
 import com.runtimeerror.sentinel.engine.Verdict;
 import com.runtimeerror.sentinel.rules.ActiveRuleSet;
 import com.runtimeerror.sentinel.rules.StarterRules;
+import com.runtimeerror.sentinel.security.ApiKeys;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +16,9 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -44,10 +48,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Needs Docker. On a laptop without Docker the whole class is skipped (that is what
  * disabledWithoutDocker does) instead of failing. GitHub's CI machines always have Docker,
  * so these tests still run on every pull request: nobody can merge code that breaks them.
+ *
+ * Every call sends an API key, like a real payment system. The key is set for this test
+ * through the properties below, and BootstrapData registers it at startup.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "sentinel.bootstrap.api-key=" + DecisionApiIntegrationTest.API_KEY)
 @Testcontainers(disabledWithoutDocker = true)
 class DecisionApiIntegrationTest {
+
+    static final String API_KEY = "decision-api-test-key";
 
     @Container
     @ServiceConnection
@@ -87,8 +97,7 @@ class DecisionApiIntegrationTest {
     void anOrdinaryPaymentIsApprovedAndRecorded() {
         String txn = id("txn");
 
-        ResponseEntity<DecisionResponse> response =
-                http.postForEntity("/v1/decisions", attempt(txn, id("card"), 1_500_00), DecisionResponse.class);
+        ResponseEntity<DecisionResponse> response = decide(attempt(txn, id("card"), 1_500_00));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().outcome()).isEqualTo(Outcome.APPROVE);
@@ -99,8 +108,8 @@ class DecisionApiIntegrationTest {
     void aRetryGetsTheOriginalDecisionBack() {
         Map<String, Object> body = attempt(id("txn"), id("card"), 2_000_00);
 
-        DecisionResponse first = http.postForObject("/v1/decisions", body, DecisionResponse.class);
-        DecisionResponse second = http.postForObject("/v1/decisions", body, DecisionResponse.class);
+        DecisionResponse first = decide(body).getBody();
+        DecisionResponse second = decide(body).getBody();
 
         assertThat(second.decisionId()).isEqualTo(first.decisionId());
         assertThat(rowsFor(first.transactionId())).isEqualTo(1);
@@ -111,8 +120,7 @@ class DecisionApiIntegrationTest {
         String card = id("card");
         List<Outcome> outcomes = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
-            outcomes.add(http.postForObject("/v1/decisions", attempt(id("txn"), card, 49_00),
-                    DecisionResponse.class).outcome());
+            outcomes.add(decide(attempt(id("txn"), card, 49_00)).getBody().outcome());
         }
 
         assertThat(outcomes.subList(0, 5)).containsOnly(Outcome.APPROVE);
@@ -125,11 +133,11 @@ class DecisionApiIntegrationTest {
         String fourth = null;
         for (int i = 1; i <= 4; i++) {
             String txn = id("txn");
-            http.postForObject("/v1/decisions", attempt(txn, card, 49_00), DecisionResponse.class);
+            decide(attempt(txn, card, 49_00));
             fourth = txn;
         }
 
-        DecisionDetail detail = http.getForObject("/v1/decisions/" + fourth, DecisionDetail.class);
+        DecisionDetail detail = get("/v1/decisions/" + fourth, DecisionDetail.class).getBody();
 
         assertThat(detail.outcome()).isEqualTo(Outcome.APPROVE);
         assertThat(detail.shadowOutcome()).isEqualTo(Outcome.DECLINE);
@@ -138,9 +146,9 @@ class DecisionApiIntegrationTest {
     @Test
     void aStoredDecisionReplaysToExactlyTheSameVerdict() {
         String txn = id("txn");
-        http.postForObject("/v1/decisions", attempt(txn, id("card"), 75_000_00), DecisionResponse.class);
+        decide(attempt(txn, id("card"), 75_000_00));
 
-        DecisionDetail stored = http.getForObject("/v1/decisions/" + txn, DecisionDetail.class);
+        DecisionDetail stored = get("/v1/decisions/" + txn, DecisionDetail.class).getBody();
         Verdict replayed = engine.evaluate(ruleSets.current(), FeatureVector.of(stored.features()));
 
         assertThat(replayed.outcome()).isEqualTo(Outcome.STEP_UP).isEqualTo(stored.outcome());
@@ -154,7 +162,7 @@ class DecisionApiIntegrationTest {
 
         // JsonNode is Jackson's generic "any JSON" type: handy when a test only needs to
         // poke at a couple of fields without writing a class for the whole response.
-        ResponseEntity<JsonNode> response = http.postForEntity("/v1/decisions", body, JsonNode.class);
+        ResponseEntity<JsonNode> response = post(body, JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         JsonNode fields = response.getBody().get("fields");
@@ -164,7 +172,7 @@ class DecisionApiIntegrationTest {
 
     @Test
     void anUnknownTransactionIsNotFoundWithAProblemBody() {
-        ResponseEntity<JsonNode> response = http.getForEntity("/v1/decisions/" + id("txn"), JsonNode.class);
+        ResponseEntity<JsonNode> response = get("/v1/decisions/" + id("txn"), JsonNode.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody().get("title").asText()).isEqualTo("Decision not found");
@@ -172,7 +180,7 @@ class DecisionApiIntegrationTest {
 
     @Test
     void theActiveRulesAreReadableOverHttp() {
-        RuleSetView view = http.getForObject("/v1/rules/active", RuleSetView.class);
+        RuleSetView view = get("/v1/rules/active", RuleSetView.class).getBody();
 
         assertThat(view.version()).isEqualTo(StarterRules.VERSION);
         assertThat(view.rules())
@@ -181,7 +189,33 @@ class DecisionApiIntegrationTest {
                 .containsExactly("card.txnCount.1m > 5");
     }
 
+    @Test
+    void aCallWithoutAnApiKeyIsTurnedAway() {
+        ResponseEntity<JsonNode> response = http.postForEntity("/v1/decisions", attempt(id("txn"), id("card"), 1_00), JsonNode.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody().get("title").asText()).isEqualTo("Not signed in");
+    }
+
     // ---- helpers ----------------------------------------------------------------------
+
+    private ResponseEntity<DecisionResponse> decide(Map<String, Object> body) {
+        return post(body, DecisionResponse.class);
+    }
+
+    private <T> ResponseEntity<T> post(Object body, Class<T> type) {
+        return http.exchange("/v1/decisions", HttpMethod.POST, new HttpEntity<>(body, withApiKey()), type);
+    }
+
+    private <T> ResponseEntity<T> get(String path, Class<T> type) {
+        return http.exchange(path, HttpMethod.GET, new HttpEntity<>(withApiKey()), type);
+    }
+
+    private static HttpHeaders withApiKey() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(ApiKeys.HEADER, API_KEY);
+        return headers;
+    }
 
     private static String id(String prefix) {
         return prefix + "-" + UUID.randomUUID();   // unique per test, so tests never share counters
