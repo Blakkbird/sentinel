@@ -17,12 +17,19 @@ spring:
   flyway:
     enabled: true                # applies db/migration/*.sql on startup, in order
 
+  jpa:
+    open-in-view: false          # database work happens inside services, never while writing a response
+    hibernate:
+      ddl-auto: none             # Flyway owns the schema; Hibernate never creates or changes tables
+
   data:
     redis:
       host: localhost
       port: 6379
       timeout: 50ms              # hard cap per Redis command; a slow Redis must not eat the latency budget
       connect-timeout: 200ms
+      repositories:
+        enabled: false           # Redis holds counters only; no Spring Data repositories live there
 
   threads:
     virtual:
@@ -30,6 +37,10 @@ spring:
 
 server:
   shutdown: graceful             # on stop, finish in-flight decisions before exiting
+  servlet:
+    session:
+      cookie:
+        same-site: lax           # the session cookie is not sent along with requests from other sites
 
 management:
   endpoints:
@@ -51,3 +62,20 @@ management:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html       # a web page for trying the API from the browser
+  paths-to-match: /v1/**         # document the payment API, not the console's own endpoints
+
+# Console accounts and the API key created on first start, if they do not exist yet.
+# The defaults are for local development only. Set the environment variables to something
+# else before deploying anywhere, and never commit real values.
+sentinel:
+  bootstrap:
+    api-key: ${SENTINEL_API_KEY:dev-sentinel-key}
+    users:
+      - username: analyst
+        display-name: Neha Kapoor
+        role: ANALYST
+        password: ${SENTINEL_ANALYST_PASSWORD:sentinel-analyst}
+      - username: admin
+        display-name: Arjun Rao
+        role: ADMIN
+        password: ${SENTINEL_ADMIN_PASSWORD:sentinel-admin}

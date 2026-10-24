@@ -138,8 +138,18 @@ sees a single site.
 
 ### 6. Try it
 
-- Open Swagger UI at http://localhost:8080/swagger-ui.html, choose `POST /v1/decisions`, click
-  "Try it out" and send:
+Locally the app creates two console accounts and one API key on first start. Override them with the
+environment variables in brackets before deploying anywhere.
+
+| What | Local default |
+|---|---|
+| Console analyst | `analyst` / `sentinel-analyst` (`SENTINEL_ANALYST_PASSWORD`) |
+| Console admin | `admin` / `sentinel-admin` (`SENTINEL_ADMIN_PASSWORD`) |
+| API key for `/v1` | `dev-sentinel-key` (`SENTINEL_API_KEY`) |
+
+- **Console:** http://localhost:5173, sign in as the analyst.
+- **Swagger UI:** http://localhost:8080/swagger-ui.html. Click **Authorize**, paste the API key, then
+  choose `POST /v1/decisions`, click "Try it out" and send:
 
   ```json
   {"transactionId": "txn-001", "cardId": "card-42", "deviceId": "dev-7", "merchantId": "mer-1",
@@ -147,8 +157,8 @@ sees a single site.
   ```
 
   `amountMinor` is in paise, so 150000 is Rs 1,500.
-- Run the simulator from the repo root: `python simulator/traffic.py` (Windows: `py simulator\traffic.py`).
-- Health check: http://localhost:8080/actuator/health
+- **Simulator**, from the repo root: `python simulator/traffic.py` (Windows: `py simulator\traffic.py`).
+- **Health check:** http://localhost:8080/actuator/health
 
 ### Troubleshooting
 
@@ -195,13 +205,17 @@ and reasons, the facts the rules saw, and what each rule did. It is defined in `
 
 ## API so far
 
+Payment systems call `/v1` with an `X-Api-Key` header. The console calls `/api` after signing in.
+
 | Method | Path | What it does |
 |---|---|---|
 | POST | `/v1/decisions` | Decide a payment |
 | GET | `/v1/decisions/{transactionId}` | The stored explanation of a decision |
 | GET | `/v1/rules/active` | The rules in use, in readable form |
 | GET | `/v1/features` | Every fact a rule can use |
-| GET | `/actuator/health` | Health of the app, Postgres and Redis |
+| POST | `/api/auth/login`, `/api/auth/logout` | Sign in and out of the console (session cookie) |
+| GET | `/api/auth/me` | Who is signed in |
+| GET | `/actuator/health` | Health of the app, Postgres and Redis (other actuator endpoints: admins only) |
 
 ## Working together
 

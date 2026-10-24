@@ -1,12 +1,30 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { ApiError } from "@/lib/api";
+import { meQueryKey } from "@/auth/useAuth";
+import { RequireAuth } from "@/auth/RequireAuth";
 import { AppShell } from "@/components/AppShell";
+import { LoginPage } from "@/pages/LoginPage";
 import { RulesPage } from "@/pages/RulesPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
-// TanStack Query fetches data, caches it, and tracks loading and error states for us.
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { refetchOnWindowFocus: false } },
+const queryClient: QueryClient = new QueryClient({
+  // If any request comes back 401, the session has ended: forget the user, and
+  // RequireAuth sends them to the sign-in page.
+  queryCache: new QueryCache({
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 401) {
+        queryClient.setQueryData(meQueryKey, null);
+      }
+    },
+  }),
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      // Retry network blips and server errors, never "not found" or "not allowed".
+      retry: (failures, error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && failures < 2,
+    },
+  },
 });
 
 export function App() {
@@ -14,7 +32,14 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route element={<AppShell />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            element={
+              <RequireAuth>
+                <AppShell />
+              </RequireAuth>
+            }
+          >
             <Route index element={<Navigate to="/rules" replace />} />
             <Route path="/rules" element={<RulesPage />} />
             <Route path="*" element={<NotFoundPage />} />

@@ -50,6 +50,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+        <!-- Sign-in, roles, CSRF protection and API keys -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <!-- JPA (Hibernate) for the console's own tables: users and API clients now, rules and
+             cases later. The decision path stays on plain SQL (see DecisionLog for why). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
         <!-- /actuator/health, /actuator/metrics -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -88,6 +99,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- MockMvc helpers for security tests: csrf(), user(...) -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
         <!-- Tests against real Postgres and Redis, started in throwaway containers -->
