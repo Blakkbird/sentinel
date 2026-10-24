@@ -27,22 +27,18 @@ Applications · TIET
 - Unit tests and an end-to-end test, run by GitHub Actions on every push and pull request.
 - `simulator/traffic.py` sends a scripted story of payments, including a card-testing attack.
 
-## Suggested plan (a starting point to discuss, not fixed)
+## Plan
 
-| Stage | Goal | Rough timing |
-|---|---|---|
-| 0 | Everyone can run, read and change the starter | Week 1 |
-| 1 | Harden the core: safe retries under concurrency, API keys | Week 2 |
-| 2 | Smarter fraud signals, and a traffic simulator with attack scenarios | Weeks 3 to 4 |
-| 3 | Rules stored in the database: versions, publish, rollback, approvals | Weeks 3 to 4 |
-| 4 | Replay: test a rule change on past decisions before it goes live | Week 5 |
-| 5 | Web console (React): explore decisions, live feed, edit and test rules | Weeks 4 to 6 |
-| 6 | Load testing, measured performance, dashboards | Weeks 6 to 7 |
-| 7 | Optional: fraud labels and accuracy per rule | If time |
-| 8 | Optional: an ML model whose score rules can use | After exams |
-| 9 | Ship: deploy, demo video, write-up | Week 8 |
+The evaluation version comes first: features you can see and explain. The deeper engineering
+(concurrency-safe retries, finer time windows, load testing) follows after the end-semester exams.
 
-Who takes what, and in which order, is for us to decide together.
+| Sprint | Goal |
+|---|---|
+| 0 | Setup: Neon, CI, a console skeleton |
+| 1 | See every decision: sign-in with roles, API keys, decision explorer, live feed, new fraud signals, attack scenarios |
+| 2 | Change rules safely: rules in the database, versions, publish and rollback, rule builder, Rule Lab (test a rule on past decisions), approvals, audit log |
+| 3 | Analyst workflow and polish: dashboard, case queue, fraud labels, screenshots, demo rehearsal |
+| After exams | Hardening: concurrency-safe retries, finer windows, circuit breaker, load tests, an ML score |
 
 ---
 
@@ -55,7 +51,7 @@ Who takes what, and in which order, is for us to decide together.
 | Git | any recent | |
 | JDK | 21 | Temurin or Oracle; `java -version` must say 21 |
 | IDE | IntelliJ IDEA (free edition is enough) | VS Code also works with "Extension Pack for Java" |
-| PostgreSQL | 16 or newer | |
+| PostgreSQL | 18 (local) or a Neon branch | See step 1 |
 | Redis | 7 | Windows: inside WSL (Ubuntu). macOS: Homebrew. Linux: apt |
 | Python | 3.11 or newer | Only for the simulator |
 | Docker | optional | `ops/docker-compose.yml` can run Postgres and Redis for you instead |
@@ -65,15 +61,33 @@ right version the first time you use it.
 
 ### 1. Database
 
-Open a Postgres prompt as the admin user (Windows: "SQL Shell (psql)" from the Start menu; macOS:
-`psql postgres`; Linux: `sudo -u postgres psql`) and run:
+Pick one.
+
+**Option A: Neon (nothing to install).** Ask for a branch of the team's Neon project. In the Neon
+console, open your branch and copy its connection string, which looks like
+`postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require`. Turn it into these environment variables
+(the password never goes in a committed file):
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "neon"
+$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://HOST/DBNAME?sslmode=require"
+$env:SPRING_DATASOURCE_USERNAME = "USER"
+$env:SPRING_DATASOURCE_PASSWORD = "PASSWORD"
+```
+
+Keep those four lines in a script outside the repo and run it (`. path\to\neon-env.ps1`) in each new
+terminal before starting the app. Stop the app when you are not using it: Neon's free plan counts
+the hours the database is awake.
+
+**Option B: Postgres on your laptop.** Open a Postgres prompt as the admin user (Windows: "SQL Shell
+(psql)" from the Start menu; macOS: `psql postgres`; Linux: `sudo -u postgres psql`) and run:
 
 ```sql
 CREATE USER sentinel WITH PASSWORD 'sentinel';
 CREATE DATABASE sentinel OWNER sentinel;
 ```
 
-The app creates its own tables when it first starts (Flyway migrations in
+Either way, the app creates its own tables when it first starts (Flyway migrations in
 `backend/src/main/resources/db/migration`).
 
 ### 2. Redis
@@ -90,7 +104,7 @@ Check with `redis-cli ping`, which should answer `PONG`. Without Redis the app s
 ### 3. Clone and open
 
 ```bash
-git clone https://github.com/<owner>/sentinel.git
+git clone https://github.com/Blakkbird/sentinel.git
 ```
 
 - Clone into a short path outside OneDrive, for example `D:\dev` or `~/dev`.
@@ -127,6 +141,7 @@ From the `backend` folder (in Windows PowerShell, type `.\mvnw` instead of `./mv
 
 - **`java -version` is not 21:** point `JAVA_HOME` at your JDK 21 folder and open a new terminal.
 - **"Connection refused" on port 5432:** Postgres is not running (Windows: Services → `postgresql-x64-…`).
+- **Neon: the first request after a break is slow:** the database was asleep and is waking up. That is normal.
 - **"Redis is NOT reachable" in the log:** start Redis (`sudo service redis-server start` in WSL). The app
   keeps working meanwhile.
 - **`./mvnw: Permission denied`** (macOS/Linux): `chmod +x mvnw`.
@@ -176,9 +191,12 @@ and reasons, the facts the rules saw, and what each rule did. It is defined in `
 ## Working together
 
 - `main` always works, and nobody pushes to it directly.
-- One branch per task (for example `s1-api-keys`), then a pull request, one review from someone else,
+- One branch per task (for example `s1/03-auth`), then a pull request, one review from someone else,
   CI green, then squash and merge.
 - Small pull requests get better reviews than big ones.
+- Nothing merges until its author can explain every line of it.
+- Before writing a Flyway migration, claim the next version number in the team chat. Two `V3` files
+  stop the app from starting. Never edit a migration that has already run somewhere.
 
 ## Tech
 
