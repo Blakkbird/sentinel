@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.data.redis.LettuceClientConfigurat
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -19,6 +20,7 @@ import java.time.Duration;
  * result to any class that asks for that type in its constructor.
  */
 @Configuration
+@EnableScheduling   // lets methods marked @Scheduled run on a timer (the live feed's keep-alive)
 public class AppConfig {
 
     /**

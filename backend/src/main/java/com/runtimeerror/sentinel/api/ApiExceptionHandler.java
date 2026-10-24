@@ -2,6 +2,7 @@ package com.runtimeerror.sentinel.api;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -9,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -54,6 +56,23 @@ public class ApiExceptionHandler {
         return problem;
     }
 
+    /** A query parameter had the wrong type, for example outcome=MAYBE: 400. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail invalidParameter(MethodArgumentTypeMismatchException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "'" + e.getValue() + "' is not a valid value for " + e.getName() + ".");
+        problem.setTitle("Invalid parameter");
+        return problem;
+    }
+
+    /** Any other request we cannot act on, with a message saying why: 400. */
+    @ExceptionHandler(BadRequestException.class)
+    public ProblemDetail badRequest(BadRequestException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        problem.setTitle("Invalid request");
+        return problem;
+    }
+
     /** GET for a transaction we have never decided: 404. */
     @ExceptionHandler(DecisionNotFoundException.class)
     public ProblemDetail decisionNotFound(DecisionNotFoundException e) {
@@ -70,12 +89,18 @@ public class ApiExceptionHandler {
      * decision, because answering without a record is the one thing Sentinel never does.
      */
     @ExceptionHandler(DataAccessException.class)
-    public ProblemDetail decisionLogUnavailable(DataAccessException e) {
-        log.error("decision log unavailable", e);
+    public ProblemDetail decisionLogUnavailable(DataAccessException e, HttpServletRequest request) {
+        log.error("database unavailable", e);
+        if ("POST".equals(request.getMethod()) && request.getRequestURI().startsWith("/v1/decisions")) {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The decision could not be recorded, so no decision was made."
+                            + " Retry with the same transactionId.");
+            problem.setTitle("Decision log unavailable");
+            return problem;
+        }
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
-                "The decision could not be recorded, so no decision was made."
-                        + " Retry with the same transactionId.");
-        problem.setTitle("Decision log unavailable");
+                "The database could not be reached. Try again in a moment.");
+        problem.setTitle("Database unavailable");
         return problem;
     }
 }
