@@ -53,6 +53,7 @@ The evaluation version comes first: features you can see and explain. The deeper
 | IDE | IntelliJ IDEA (free edition is enough) | VS Code also works with "Extension Pack for Java" |
 | PostgreSQL | 18 (local) or a Neon branch | See step 1 |
 | Redis | 7 | Windows: inside WSL (Ubuntu). macOS: Homebrew. Linux: apt |
+| Node.js | 20.19 or newer (24 LTS is fine) | Only for the web console |
 | Python | 3.11 or newer | Only for the simulator |
 | Docker | optional | `ops/docker-compose.yml` can run Postgres and Redis for you instead |
 
@@ -123,7 +124,19 @@ From the `backend` folder (in Windows PowerShell, type `.\mvnw` instead of `./mv
 - The end-to-end test needs Docker. Without Docker it is skipped on your laptop; GitHub's CI still runs it.
 - In the app's log, look for `Redis is reachable` and `Started SentinelApplication`.
 
-### 5. Try it
+### 5. The web console
+
+The backend must be running. Then, in a second terminal, from the `console` folder:
+
+```bash
+npm ci          # first time, and whenever package-lock.json changes
+npm run dev     # opens on http://localhost:5173
+```
+
+Vite (the dev server) forwards every `/api` request to the backend on port 8080, so the browser
+sees a single site.
+
+### 6. Try it
 
 - Open Swagger UI at http://localhost:8080/swagger-ui.html, choose `POST /v1/decisions`, click
   "Try it out" and send:
@@ -167,6 +180,8 @@ sentinel/
 │       │   └── config/          hand-wired objects: clock, engine, Redis client options
 │       ├── main/resources/      application.yml (settings), db/migration (SQL)
 │       └── test/java/...        unit tests and one end-to-end test
+├── console/                     the web console (React, TypeScript, Vite, Tailwind)
+│   └── src/                     pages/, components/, lib/ (API client, formatting)
 ├── simulator/                   Python script that sends test payments
 ├── ops/                         optional Docker setup for Postgres and Redis
 └── .github/                     CI workflow and pull request template
@@ -200,5 +215,5 @@ and reasons, the facts the rules saw, and what each rule did. It is defined in `
 
 ## Tech
 
-Java 21 · Spring Boot 3.5 · PostgreSQL · Redis · Flyway · JUnit 5, AssertJ, Testcontainers ·
-GitHub Actions · Python (simulator)
+Java 21 · Spring Boot 3.5 · PostgreSQL (Neon) · Redis · Flyway · JUnit 5, AssertJ, Testcontainers ·
+React 19, TypeScript, Vite, Tailwind CSS, TanStack Query · GitHub Actions · Python (simulator)

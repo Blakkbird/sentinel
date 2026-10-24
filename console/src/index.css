@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+/*
+ * Sentinel's look, in one place.
+ *
+ * Ink on paper: a cool off-white page, deep navy text, hairline rules. Colour is reserved
+ * for meaning. Green, amber and red are the three outcomes; violet is "what a shadow rule
+ * would have done". Nothing else on screen is coloured, so a red band in the live feed is
+ * impossible to miss.
+ *
+ * The variables use shadcn/ui's names (background, foreground, primary, muted, border,
+ * ring...) so components added later with `npx shadcn add ...` fit in without edits.
+ */
+
+:root {
+  --background: #f3f5f8;
+  --foreground: #16233b;
+  --card: #ffffff;
+  --card-foreground: #16233b;
+  --popover: #ffffff;
+  --popover-foreground: #16233b;
+  --primary: #16233b;
+  --primary-foreground: #ffffff;
+  --secondary: #e9edf2;
+  --secondary-foreground: #16233b;
+  --muted: #e9edf2;
+  --muted-foreground: #5a6678;
+  --accent: #e9edf2;
+  --accent-foreground: #16233b;
+  --destructive: #c0381e;
+  --border: #dce1e8;
+  --input: #c9d1dc;
+  --ring: #2f5bd3;
+
+  --approve: #1d7a55;
+  --stepup: #a15c00;
+  --decline: #c0381e;
+  --shadow: #6a55b8;
+
+  --hero: #16233b;
+  --hero-foreground: #e5eaf2;
+
+  --radius: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0e1525;
+    --foreground: #e5eaf2;
+    --card: #141d30;
+    --card-foreground: #e5eaf2;
+    --popover: #141d30;
+    --popover-foreground: #e5eaf2;
+    --primary: #e5eaf2;
+    --primary-foreground: #0e1525;
+    --secondary: #1b2640;
+    --secondary-foreground: #e5eaf2;
+    --muted: #1b2640;
+    --muted-foreground: #95a1b5;
+    --accent: #1b2640;
+    --accent-foreground: #e5eaf2;
+    --destructive: #f26b50;
+    --border: #253149;
+    --input: #33405c;
+    --ring: #7fa2ff;
+
+    --approve: #3bbf8a;
+    --stepup: #e3a23b;
+    --decline: #f26b50;
+    --shadow: #a897f0;
+
+    --hero: #141d30;
+    --hero-foreground: #e5eaf2;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-approve: var(--approve);
+  --color-stepup: var(--stepup);
+  --color-decline: var(--decline);
+  --color-shadow: var(--shadow);
+  --color-hero: var(--hero);
+  --color-hero-foreground: var(--hero-foreground);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+@theme {
+  /* One type family in three widths. Condensed carries titles and big figures,
+     regular carries everything you read, mono is only for identifiers. */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --animate-arrive: arrive 1.6s ease-out;
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes rise {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes arrive {
+    from {
+      background-color: color-mix(in oklab, var(--ring) 14%, transparent);
+    }
+    to {
+      background-color: transparent;
+    }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
