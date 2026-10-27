@@ -30,8 +30,16 @@ export function useLiveDecisions(max = 200) {
         const seen = new Set(current.map((d) => d.decisionId));
         const fresh = incoming.filter((d) => !seen.has(d.decisionId));
         if (live) fresh.forEach((d) => arrivedLive.current.add(d.decisionId));
-        const merged = live ? [...fresh, ...current] : [...current, ...fresh];
-        return merged.slice(0, max);
+        const merged = (live ? [...fresh, ...current] : [...current, ...fresh]).slice(0, max);
+        // Forget highlight marks for rows that have scrolled off the end, so the set stays
+        // as small as the list instead of growing for as long as the page is open.
+        if (arrivedLive.current.size > max) {
+          const kept = new Set(merged.map((d) => d.decisionId));
+          arrivedLive.current.forEach((id) => {
+            if (!kept.has(id)) arrivedLive.current.delete(id);
+          });
+        }
+        return merged;
       });
     },
     [max],

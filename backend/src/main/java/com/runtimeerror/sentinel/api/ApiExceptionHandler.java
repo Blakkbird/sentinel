@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -48,10 +49,13 @@ public class ApiExceptionHandler {
 
     /** The body was not readable JSON, or a value had the wrong format: 400. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail unreadableRequest(HttpMessageNotReadableException e) {
+    public ProblemDetail unreadableRequest(HttpMessageNotReadableException e, HttpServletRequest request) {
+        // The date hint only makes sense for the payment API; the console's endpoints have no occurredAt.
+        String hint = request.getRequestURI().startsWith("/v1/decisions")
+                ? " (occurredAt must look like 2026-09-27T10:15:30Z)."
+                : ".";
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "The request body is not valid JSON, or a value has the wrong format"
-                        + " (occurredAt must look like 2026-09-27T10:15:30Z).");
+                "The request body is not valid JSON, or a value has the wrong format" + hint);
         problem.setTitle("Unreadable request");
         return problem;
     }
@@ -78,6 +82,24 @@ public class ApiExceptionHandler {
     public ProblemDetail decisionNotFound(DecisionNotFoundException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
         problem.setTitle("Decision not found");
+        return problem;
+    }
+
+    /**
+     * The database refused a change because it broke a constraint, for example a unique
+     * column: 409. The database is working fine, so this must not be reported as an outage.
+     *
+     * Spring picks the most specific handler for an exception. DataIntegrityViolationException
+     * is a kind of DataAccessException, so it lands here rather than in the 503 handler below.
+     * (The decision path catches its own DuplicateKeyException in DecisionService, so a
+     * retried payment never reaches this.)
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail constraintViolated(DataIntegrityViolationException e) {
+        log.warn("constraint violated: {}", e.getMostSpecificCause().getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "The change conflicts with data that is already stored. Reload and try again.");
+        problem.setTitle("Conflict");
         return problem;
     }
 
