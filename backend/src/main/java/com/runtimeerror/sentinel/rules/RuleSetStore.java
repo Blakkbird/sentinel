@@ -3,6 +3,8 @@ package com.runtimeerror.sentinel.rules;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.runtimeerror.sentinel.engine.InvalidRuleSetException;
+import com.runtimeerror.sentinel.engine.RuleDefinition;
+import com.runtimeerror.sentinel.security.Actor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -10,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,6 +73,58 @@ public class RuleSetStore {
     /** Every time this one version went live, oldest first. */
     public List<RuleSetActivation> activationsOf(int version) {
         return jdbc.query(SELECT_ACTIVATIONS + "where version = ? order by id", this::mapActivation, version);
+    }
+
+    // ---- writes ---------------------------------------------------------------------
+    //
+    // Each change below is one UPDATE whose WHERE clause states what must still be true
+    // ("still a draft", "still at revision 4"). The method returns whether a row changed. If
+    // someone else got there first, nothing changes and the caller can say so. This is called
+    // optimistic locking: no lock is held while a person edits, and a clash is detected at the
+    // moment of saving instead.
+
+    /** A new draft, numbered by the database. Returns its version number. */
+    public int insertDraft(int basedOn, String title, List<RuleDefinition> rules, Actor author, Instant at) {
+        Integer version = jdbc.queryForObject("""
+                insert into rule_set (status, based_on, title, definition, revision,
+                                      created_by, created_by_name, created_at, updated_at)
+                values ('DRAFT', ?, ?, cast(? as jsonb), 1, ?, ?, ?, ?)
+                returning version
+                """, Integer.class,
+                basedOn, title, toJson(rules), author.username(), author.displayName(), utc(at), utc(at));
+        if (version == null) {
+            throw new IllegalStateException("the database did not return the new draft's version");
+        }
+        return version;
+    }
+
+    /** Saves new rules into a draft, only if it is still a draft at the revision the editor started from. */
+    public boolean updateDraft(int version, int expectedRevision, String title, List<RuleDefinition> rules, Instant at) {
+        return jdbc.update("""
+                update rule_set
+                set title = ?, definition = cast(? as jsonb), revision = revision + 1, updated_at = ?
+                where version = ? and status = 'DRAFT' and revision = ?
+                """, title, toJson(rules), utc(at), version, expectedRevision) == 1;
+    }
+
+    /** Throws a draft away. It stays in the table, for the record. */
+    public boolean discard(int version, Instant at) {
+        return jdbc.update("""
+                update rule_set set status = 'DISCARDED', updated_at = ?
+                where version = ? and status = 'DRAFT'
+                """, utc(at), version) == 1;
+    }
+
+    private String toJson(List<RuleDefinition> rules) {
+        try {
+            return json.writeValueAsString(RuleSetJson.write(rules));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("could not write rules as JSON", e);
+        }
+    }
+
+    static OffsetDateTime utc(Instant at) {
+        return at.atOffset(ZoneOffset.UTC);
     }
 
     // ---- row mapping ------------------------------------------------------------------

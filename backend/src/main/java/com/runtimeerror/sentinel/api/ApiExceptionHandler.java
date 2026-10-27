@@ -1,6 +1,8 @@
 package com.runtimeerror.sentinel.api;
 
+import com.runtimeerror.sentinel.engine.InvalidRuleSetException;
 import com.runtimeerror.sentinel.rules.RuleSetNotFoundException;
+import com.runtimeerror.sentinel.rules.RuleSetRefusedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
@@ -91,6 +93,32 @@ public class ApiExceptionHandler {
     public ProblemDetail ruleSetNotFound(RuleSetNotFoundException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
         problem.setTitle("Rule set not found");
+        return problem;
+    }
+
+    /**
+     * A rule set that does not hold together: 400, listing every problem, each with its place,
+     * for example "rules[2] (VEL_CARD_1M).condition.op: must be one of GT, GTE, ...". The rule
+     * builder shows them next to the rules they are about.
+     */
+    @ExceptionHandler(InvalidRuleSetException.class)
+    public ProblemDetail invalidRuleSet(InvalidRuleSetException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                e.problems().size() == 1 ? "The rule set has a problem." : "The rule set has " + e.problems().size() + " problems.");
+        problem.setTitle("Rule set is invalid");
+        problem.setProperty("problems", e.problems());
+        return problem;
+    }
+
+    /**
+     * A rule workflow step that was refused, with the reason. 403 when this person may never do
+     * it (only the author edits a draft), 409 when nobody can right now (it is no longer a draft).
+     */
+    @ExceptionHandler(RuleSetRefusedException.class)
+    public ProblemDetail ruleSetRefused(RuleSetRefusedException e) {
+        HttpStatus status = e.forbidden() ? HttpStatus.FORBIDDEN : HttpStatus.CONFLICT;
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, e.getMessage());
+        problem.setTitle(e.forbidden() ? "Not allowed" : "Not possible right now");
         return problem;
     }
 

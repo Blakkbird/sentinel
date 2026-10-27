@@ -151,6 +151,21 @@ export interface RuleSetActivation {
   activatedAt: string;
 }
 
+/** Something a person can do to a version. The server says which are allowed, and why not. */
+export type RuleSetAction = "EDIT" | "DISCARD";
+
+export interface Permission {
+  action: RuleSetAction;
+  allowed: boolean;
+  reason: string | null;
+}
+
+/** A fact rules can use, from the feature catalogue. */
+export interface FeatureSpec {
+  name: string;
+  description: string;
+}
+
 export interface RuleSetDetail {
   version: number;
   status: RuleSetStatus;
@@ -170,4 +185,5 @@ export interface RuleSetDetail {
   liveVersion: number;
   rules: RuleDocument[];
   activations: RuleSetActivation[];
+  permissions: Permission[];
 }
