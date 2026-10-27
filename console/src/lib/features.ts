@@ -5,9 +5,9 @@ import { formatCount, formatMoney } from "./format";
  * (card.txnCount.1m) and a long description; the console shows these labels instead.
  * A feature missing from this list still displays, under its technical name.
  */
-type Kind = "money" | "count" | "flag";
+export type FeatureKind = "money" | "count" | "flag";
 
-const FEATURES: Record<string, { label: string; kind: Kind }> = {
+const FEATURES: Record<string, { label: string; kind: FeatureKind }> = {
   "txn.amountMinor": { label: "Payment amount", kind: "money" },
   "sys.velocityAvailable": { label: "Counters available", kind: "flag" },
   "card.txnCount.1m": { label: "Card attempts this minute", kind: "count" },
@@ -23,8 +23,13 @@ export function featureLabel(name: string): string {
   return FEATURES[name]?.label ?? name;
 }
 
+/** money (paise), count, or flag (1 = yes, 0 = no). Unknown features are treated as counts. */
+export function featureKind(name: string): FeatureKind {
+  return FEATURES[name]?.kind ?? "count";
+}
+
 export function formatFeatureValue(name: string, value: number, currency = "INR"): string {
-  const kind = FEATURES[name]?.kind ?? "count";
+  const kind = featureKind(name);
   if (kind === "money") return formatMoney(value, currency);
   if (kind === "flag") return value === 1 ? "Yes" : "No";
   return Number.isInteger(value) ? formatCount(value) : String(value);

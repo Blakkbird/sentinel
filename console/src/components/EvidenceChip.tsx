@@ -1,10 +1,8 @@
 import { Check, X } from "lucide-react";
 import type { Evidence } from "@/lib/types";
-import { featureLabel, formatFeatureValue } from "@/lib/features";
+import { featureKind, featureLabel, formatFeatureValue } from "@/lib/features";
 import { OPERATOR_SYMBOL } from "@/lib/outcomes";
 import { cn } from "@/lib/utils";
-
-const FLAGS = new Set(["card.newDevice", "sys.velocityAvailable"]);
 
 /**
  * One comparison from a rule, checked against what the rule actually saw:
@@ -14,7 +12,7 @@ const FLAGS = new Set(["card.newDevice", "sys.velocityAvailable"]);
 export function EvidenceChip({ evidence, currency }: { evidence: Evidence; currency: string }) {
   const { feature, op, threshold, actual, holds } = evidence;
   const missing = actual === null;
-  const isFlag = FLAGS.has(feature);
+  const isFlag = featureKind(feature) === "flag";
 
   const condition = `${feature} ${OPERATOR_SYMBOL[op]} ${threshold}`;
   const verdict = missing ? "not available, so the rule could not run" : holds ? "met" : "not met";
