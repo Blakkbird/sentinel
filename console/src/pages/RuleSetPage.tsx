@@ -4,12 +4,13 @@ import { ArrowLeft, Copy, LoaderCircle, Save, Trash2, Undo2 } from "lucide-react
 import { ApiError } from "@/lib/api";
 import type { RuleSetDetail } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
-import { ACTIVATION_LABEL, checkRules, fromEditable, toEditable, type EditableRule, type RuleShape } from "@/lib/rules";
+import { checkRules, fromEditable, toEditable, type EditableRule, type RuleShape } from "@/lib/rules";
 import { permission, useCreateDraft, useFeatures, useRuleSet, useRuleSetStep, useSaveDraft } from "@/hooks/useRuleSets";
 import { RuleBuilder } from "@/components/rules/RuleBuilder";
 import { RuleCards } from "@/components/rules/RuleCards";
 import { RuleDiff } from "@/components/rules/RuleDiff";
 import { RuleLabPanel } from "@/components/rules/RuleLabPanel";
+import { VersionHistory } from "@/components/rules/VersionHistory";
 import { StatusBadge } from "@/components/rules/StatusBadge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Tabs } from "@/components/Tabs";
@@ -19,8 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Tab = "rules" | "changes" | "lab";
-const TABS: Tab[] = ["rules", "changes", "lab"];
+type Tab = "rules" | "changes" | "lab" | "history";
+const TABS: Tab[] = ["rules", "changes", "lab", "history"];
 
 /** One version of the rules. A draft opens in the rule builder for its author; anything else is read-only. */
 export function RuleSetPage() {
@@ -170,6 +171,7 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
           { value: "rules", label: "Rules" },
           { value: "changes", label: "Changes" },
           { value: "lab", label: "Rule Lab" },
+          { value: "history", label: "History" },
         ]}
       />
 
@@ -187,7 +189,7 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
         ))}
       {tab === "changes" && <ChangesTab d={d} current={current} />}
       {tab === "lab" && <RuleLabPanel d={d} unsavedEdits={editable && dirty} />}
-      {tab === "rules" && !editable && <LivePeriods d={d} />}
+      {tab === "history" && <VersionHistory d={d} />}
 
       {editable && dirty && (
         <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-md border bg-card px-4 py-3 shadow-md">
@@ -258,29 +260,4 @@ function ChangesTab({ d, current }: { d: RuleSetDetail; current: RuleShape[] }) 
   if (base.isError) return <ErrorState error={base.error} onRetry={() => base.refetch()} />;
   if (!base.data) return <Skeleton className="h-48 w-full" />;
   return <RuleDiff before={base.data.rules} after={current} beforeVersion={d.basedOn} />;
-}
-
-function LivePeriods({ d }: { d: RuleSetDetail }) {
-  return (
-    <section aria-labelledby="live-periods" className="space-y-2">
-      <h2 id="live-periods" className="text-[16px] font-semibold">
-        When it was live
-      </h2>
-      {d.activations.length === 0 ? (
-        <p className="text-muted-foreground">This version has never been live.</p>
-      ) : (
-        <ul className="space-y-1 text-[13px]">
-          {d.activations.map((a) => (
-            <li key={a.id}>
-              <span className="tabular">{formatDateTime(a.activatedAt)}</span>
-              <span className="text-muted-foreground">
-                {" "}
-                {ACTIVATION_LABEL[a.kind]}, by {a.activatedByName}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
 }

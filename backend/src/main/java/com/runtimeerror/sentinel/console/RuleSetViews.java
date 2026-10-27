@@ -1,5 +1,7 @@
 package com.runtimeerror.sentinel.console;
 
+import com.runtimeerror.sentinel.audit.AuditEvent;
+import com.runtimeerror.sentinel.audit.AuditLog;
 import com.runtimeerror.sentinel.engine.Outcome;
 import com.runtimeerror.sentinel.engine.RuleDefinition;
 import com.runtimeerror.sentinel.engine.RuleMode;
@@ -89,16 +91,19 @@ public class RuleSetViews {
             int liveVersion,
             List<Rule> rules,
             List<RuleSetActivation> activations,
-            List<RuleSetService.Permission> permissions
+            List<RuleSetService.Permission> permissions,
+            List<AuditEvent> history
     ) {
     }
 
     private final RuleSetStore store;
     private final RuleSetService service;
+    private final AuditLog audit;
 
-    public RuleSetViews(RuleSetStore store, RuleSetService service) {
+    public RuleSetViews(RuleSetStore store, RuleSetService service, AuditLog audit) {
         this.store = store;
         this.service = service;
+        this.audit = audit;
     }
 
     public Listing list() {
@@ -119,7 +124,8 @@ public class RuleSetViews {
                 rs.version() == live, live,
                 rs.rules().stream().map(Rule::of).toList(),
                 store.activationsOf(version),
-                service.permissions(rs, viewer));
+                service.permissions(rs, viewer),
+                audit.forTarget(AuditLog.RULE_SET, String.valueOf(version)));
     }
 
     int liveVersion() {
