@@ -96,7 +96,15 @@ function DecisionBody({ d, now }: { d: DecisionView; now: number }) {
         </Fact>
         <Fact label="Device">{d.deviceId ? <IdLink id={d.deviceId} /> : <span className="text-muted-foreground">Not sent</span>}</Fact>
         <Fact label="Merchant">{d.merchantId ? <IdLink id={d.merchantId} /> : <span className="text-muted-foreground">Not sent</span>}</Fact>
-        <Fact label="Rule set">Version {d.ruleSetVersion}</Fact>
+        <Fact label="Rule set">
+          <Link
+            to={`/rules/${d.ruleSetVersion}`}
+            className="underline decoration-border underline-offset-4 hover:decoration-foreground"
+            title="The exact rules that made this decision"
+          >
+            Version {d.ruleSetVersion}
+          </Link>
+        </Fact>
         <Fact label="Server time">
           <span className="tabular">{formatMicros(d.computeMicros)}</span>
         </Fact>
