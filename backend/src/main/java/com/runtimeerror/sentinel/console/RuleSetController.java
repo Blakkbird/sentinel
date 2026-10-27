@@ -1,6 +1,8 @@
 package com.runtimeerror.sentinel.console;
 
 import com.runtimeerror.sentinel.api.BadRequestException;
+import com.runtimeerror.sentinel.lab.ReplayReport;
+import com.runtimeerror.sentinel.lab.RuleLab;
 import com.runtimeerror.sentinel.rules.RuleSetService;
 import com.runtimeerror.sentinel.rules.StoredRuleSet;
 import com.runtimeerror.sentinel.security.Actor;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -24,6 +27,8 @@ import java.net.URI;
  *   POST /api/rule-sets                     start a draft: {"from": 2, "title": "..."}, both optional
  *   PUT  /api/rule-sets/{version}           save a draft: {"revision": 1, "title": "...", "rules": [...]}
  *   POST /api/rule-sets/{version}/discard   throw a draft away
+ *   GET  /api/rule-sets/{version}/replay    Rule Lab: this version against the live rules, on the
+ *                                           last N decisions (?decisions=1000, at most 5000)
  *
  * Spring passes the signed-in person in as "authentication". It becomes an Actor at once, so
  * nothing past this class needs to know about Spring Security.
@@ -45,10 +50,12 @@ public class RuleSetController {
 
     private final RuleSetViews views;
     private final RuleSetService rules;
+    private final RuleLab lab;
 
-    public RuleSetController(RuleSetViews views, RuleSetService rules) {
+    public RuleSetController(RuleSetViews views, RuleSetService rules, RuleLab lab) {
         this.views = views;
         this.rules = rules;
+        this.lab = lab;
     }
 
     @GetMapping
@@ -88,5 +95,12 @@ public class RuleSetController {
         Actor actor = Actor.from(authentication);
         rules.discard(version, actor);
         return views.detail(version, actor);
+    }
+
+    /** Read-only, so a GET: it changes nothing, and the result can be bookmarked or refreshed. */
+    @GetMapping("/{version}/replay")
+    public ReplayReport replay(@PathVariable int version,
+                               @RequestParam(defaultValue = "" + RuleLab.DEFAULT_DECISIONS) int decisions) {
+        return lab.replay(version, decisions);
     }
 }

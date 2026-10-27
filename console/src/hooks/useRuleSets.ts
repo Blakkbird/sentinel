@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { api, json } from "@/lib/api";
-import type { FeatureSpec, RuleSetAction, RuleSetDetail, RuleSetListing } from "@/lib/types";
+import type { FeatureSpec, ReplayReport, RuleSetAction, RuleSetDetail, RuleSetListing } from "@/lib/types";
 import type { RuleShape } from "@/lib/rules";
 
 /**
@@ -34,6 +34,7 @@ function useAfterChange() {
     queryClient.setQueryData(["rule-set", detail.version], detail);
     void queryClient.invalidateQueries({ queryKey: ["rule-sets"] });
     void queryClient.invalidateQueries({ queryKey: ["rule-set"], predicate: (q) => q.queryKey[1] !== detail.version });
+    void queryClient.invalidateQueries({ queryKey: ["replay"] });
   };
 }
 
@@ -71,4 +72,13 @@ export function useRuleSetStep(version: number) {
 
 export function permission(detail: RuleSetDetail, action: RuleSetAction) {
   return detail.permissions.find((p) => p.action === action) ?? { action, allowed: false, reason: null };
+}
+
+/** Rule Lab: this version against the live rules, on the last N decisions. Runs when the tab opens. */
+export function useReplay(version: number, decisions: number) {
+  return useQuery({
+    queryKey: ["replay", version, decisions],
+    queryFn: () => api<ReplayReport>(`/api/rule-sets/${version}/replay?decisions=${decisions}`),
+    retry: false,
+  });
 }

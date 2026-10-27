@@ -187,3 +187,37 @@ export interface RuleSetDetail {
   activations: RuleSetActivation[];
   permissions: Permission[];
 }
+
+/** What the Rule Lab found. Outcome strips have one letter per decision, oldest first: A, S or D. */
+export interface ReplayReport {
+  version: number;
+  liveVersion: number;
+  decisions: number;
+  from: string | null;
+  to: string | null;
+  liveOutcomes: Record<Outcome, number>;
+  versionOutcomes: Record<Outcome, number>;
+  changed: number;
+  moves: { from: Outcome; to: Outcome; count: number }[];
+  rules: {
+    code: string;
+    mode: RuleMode;
+    proposes: Outcome;
+    liveFired: number | null;
+    versionFired: number | null;
+    versionAbstained: number;
+  }[];
+  examples: {
+    transactionId: string;
+    decidedAt: string;
+    cardId: string;
+    amountMinor: number;
+    currency: string;
+    before: Outcome;
+    after: Outcome;
+    reasonCodes: string[];
+  }[];
+  liveStrip: string;
+  versionStrip: string;
+  check: { checked: number; matched: number; unknownVersion: number };
+}
