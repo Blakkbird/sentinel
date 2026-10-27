@@ -95,3 +95,79 @@ export interface DecisionView {
   facts: Fact[];
   rules: RuleResultView[];
 }
+
+// ---- rule sets (Sprint 2) ---------------------------------------------------------------
+
+export type RuleSetStatus = "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED" | "DISCARDED";
+
+/** A rule's condition as stored: a small tree. The same shape as RuleSetJson on the backend. */
+export type ConditionNode =
+  | { type: "compare"; feature: string; op: Operator; value: number }
+  | { type: "all"; parts: ConditionNode[] }
+  | { type: "any"; parts: ConditionNode[] }
+  | { type: "not"; inner: ConditionNode };
+
+/** One version in a list. "live" means it is deciding payments right now. */
+export interface RuleSetSummary {
+  version: number;
+  status: RuleSetStatus;
+  title: string;
+  basedOn: number | null;
+  ruleCount: number;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  live: boolean;
+}
+
+export interface RuleSetListing {
+  liveVersion: number;
+  previousVersion: number | null;
+  items: RuleSetSummary[];
+}
+
+/** A rule as stored, plus its condition as one line of text (card.txnCount.1m > 5). */
+export interface RuleDocument {
+  code: string;
+  description: string;
+  mode: RuleMode;
+  proposes: Outcome;
+  reasonCode: string;
+  condition: ConditionNode;
+  conditionText: string;
+}
+
+/** "From this moment, this version was live." */
+export interface RuleSetActivation {
+  id: number;
+  version: number;
+  kind: "SEED" | "PUBLISH" | "ROLLBACK";
+  activatedBy: string;
+  activatedByName: string;
+  activatedAt: string;
+}
+
+export interface RuleSetDetail {
+  version: number;
+  status: RuleSetStatus;
+  title: string;
+  basedOn: number | null;
+  revision: number;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt: string | null;
+  reviewedBy: string | null;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  live: boolean;
+  liveVersion: number;
+  rules: RuleDocument[];
+  activations: RuleSetActivation[];
+}

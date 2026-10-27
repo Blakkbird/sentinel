@@ -9,6 +9,7 @@ import { LivePage } from "@/pages/LivePage";
 import { DecisionsPage } from "@/pages/DecisionsPage";
 import { DecisionDetailPage } from "@/pages/DecisionDetailPage";
 import { RulesPage } from "@/pages/RulesPage";
+import { RuleSetPage } from "@/pages/RuleSetPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 const queryClient: QueryClient = new QueryClient({
@@ -48,6 +49,7 @@ export function App() {
             <Route path="/decisions" element={<DecisionsPage />} />
             <Route path="/decisions/:transactionId" element={<DecisionDetailPage />} />
             <Route path="/rules" element={<RulesPage />} />
+            <Route path="/rules/:version" element={<RuleSetPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

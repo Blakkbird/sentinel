@@ -15,16 +15,16 @@ import static com.runtimeerror.sentinel.engine.RuleMode.ACTIVE;
 import static com.runtimeerror.sentinel.engine.RuleMode.SHADOW;
 
 /**
- * The rules, written in code for now.
+ * The rules as they were written in Java before Sprint 2: version 2, kept as a record.
  *
- * Version 1 had the first six rules below. Version 2 (Sprint 1) adds two that use the new
+ * Version 1 had the first six rules below. Version 2 (Sprint 1) added two that use the
  * device signals: DEVICE_MANY_CARDS_1H, in shadow while we measure it, and
- * NEW_DEVICE_HIGH_AMOUNT. Any change to the rules gets a new version number, because every
- * stored decision records the version that made it.
+ * NEW_DEVICE_HIGH_AMOUNT.
  *
- * From stage 3 rules live in the database as JSON, are edited from the console, and are
- * published as new versions without restarting anything. The RuleDefinition objects
- * below are exactly the shape that JSON will take, so nothing else changes then.
+ * Since Sprint 2 the live rules come from the database (table rule_set, see ActiveRuleSet),
+ * and nothing in the running application reads this class. Migration V3 copied versions 1
+ * and 2 into the database as JSON, and RuleSetSeedIntegrationTest checks that the copy still
+ * matches this file exactly. New rules are written in the console's rule builder, never here.
  *
  * Amounts are in paise, written with Indian digit grouping so they read naturally:
  *   50_000_00  = 5,000,000 paise = Rs 50,000

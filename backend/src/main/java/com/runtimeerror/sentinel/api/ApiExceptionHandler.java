@@ -1,5 +1,6 @@
 package com.runtimeerror.sentinel.api;
 
+import com.runtimeerror.sentinel.rules.RuleSetNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
@@ -82,6 +83,14 @@ public class ApiExceptionHandler {
     public ProblemDetail decisionNotFound(DecisionNotFoundException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
         problem.setTitle("Decision not found");
+        return problem;
+    }
+
+    /** A rule set version that does not exist: 404. */
+    @ExceptionHandler(RuleSetNotFoundException.class)
+    public ProblemDetail ruleSetNotFound(RuleSetNotFoundException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        problem.setTitle("Rule set not found");
         return problem;
     }
 
