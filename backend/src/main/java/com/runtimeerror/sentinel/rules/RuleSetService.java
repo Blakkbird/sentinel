@@ -1,15 +1,20 @@
 package com.runtimeerror.sentinel.rules;
 
+import com.runtimeerror.sentinel.audit.AuditAction;
+import com.runtimeerror.sentinel.audit.AuditLog;
 import com.runtimeerror.sentinel.engine.InvalidRuleSetException;
 import com.runtimeerror.sentinel.engine.RuleDefinition;
 import com.runtimeerror.sentinel.engine.RuleSet;
 import com.runtimeerror.sentinel.features.Features;
 import com.runtimeerror.sentinel.security.Actor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The rule workflow: who may do what to which version, and doing it.
@@ -21,6 +26,11 @@ import java.util.List;
  *
  * Nothing invalid is ever stored: a draft's rules are read with RuleSetJson (shape) and checked
  * with RuleSet.compile (meaning) before every save. So every row in rule_set compiles.
+ *
+ * Every step that changes a version's status also writes an audit row, inside one transaction
+ * (TransactionTemplate): the change and its record are saved together or not at all. Saving a
+ * draft's edits is not audited; what matters for the record is what was submitted, approved and
+ * published, and those versions can no longer change.
  */
 @Service
 public class RuleSetService {
@@ -45,10 +55,14 @@ public class RuleSetService {
     static final int MAX_TITLE_LENGTH = 120;
 
     private final RuleSetStore store;
+    private final AuditLog audit;
+    private final TransactionTemplate tx;
     private final Clock clock;
 
-    public RuleSetService(RuleSetStore store, Clock clock) {
+    public RuleSetService(RuleSetStore store, AuditLog audit, TransactionTemplate tx, Clock clock) {
         this.store = store;
+        this.audit = audit;
+        this.tx = tx;
         this.clock = clock;
     }
 
@@ -78,7 +92,16 @@ public class RuleSetService {
         String name = title == null || title.isBlank()
                 ? (source.version() == live ? "Changes to version " + live : "Copy of version " + source.version())
                 : cleanTitle(title);
-        int version = store.insertDraft(live, name, source.rules(), author, clock.instant());
+        Instant now = clock.instant();
+        Integer version = tx.execute(status -> {
+            int created = store.insertDraft(live, name, source.rules(), author, now);
+            audit(author, AuditAction.RULE_SET_DRAFTED, created,
+                    "Started draft v" + created + (source.version() == live
+                            ? " from the live version, v" + live
+                            : " as a copy of v" + source.version() + " (v" + live + " is live)"),
+                    Map.of("copiedFrom", source.version(), "basedOn", live), now);
+            return created;
+        });
         return get(version);
     }
 
@@ -105,9 +128,13 @@ public class RuleSetService {
     public StoredRuleSet discard(int version, Actor author) {
         StoredRuleSet draft = get(version);
         require(Action.DISCARD, draft, author);
-        if (!store.discard(version, clock.instant())) {
-            throw new RuleSetRefusedException(false, "Version " + version + " is no longer a draft. Reload to see why.");
-        }
+        Instant now = clock.instant();
+        tx.executeWithoutResult(status -> {
+            if (!store.discard(version, now)) {
+                throw new RuleSetRefusedException(false, "Version " + version + " is no longer a draft. Reload to see why.");
+            }
+            audit(author, AuditAction.RULE_SET_DISCARDED, version, "Discarded draft v" + version, Map.of(), now);
+        });
         return get(version);
     }
 
@@ -148,6 +175,11 @@ public class RuleSetService {
     }
 
     // ---- helpers ----------------------------------------------------------------------
+
+    private void audit(Actor actor, AuditAction action, int version, String summary, Map<String, Object> details,
+                       Instant at) {
+        audit.record(actor, action, AuditLog.RULE_SET, String.valueOf(version), summary, details, at);
+    }
 
     static String describe(RuleSetStatus status) {
         return switch (status) {

@@ -166,6 +166,24 @@ export interface FeatureSpec {
   description: string;
 }
 
+/** One entry of the audit log. */
+export interface AuditEvent {
+  id: number;
+  occurredAt: string;
+  actor: string;
+  actorName: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  summary: string;
+  details: Record<string, unknown>;
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[];
+  nextBefore: number | null;
+}
+
 export interface RuleSetDetail {
   version: number;
   status: RuleSetStatus;
@@ -186,6 +204,7 @@ export interface RuleSetDetail {
   rules: RuleDocument[];
   activations: RuleSetActivation[];
   permissions: Permission[];
+  history: AuditEvent[];
 }
 
 /** What the Rule Lab found. Outcome strips have one letter per decision, oldest first: A, S or D. */
