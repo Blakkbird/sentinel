@@ -1,6 +1,7 @@
 package com.runtimeerror.sentinel.console;
 
 import com.runtimeerror.sentinel.decision.DecisionRecorded;
+import com.runtimeerror.sentinel.rules.RuleSetActivated;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.MediaType;
@@ -75,6 +76,20 @@ public class DecisionStream {
                 .name("decision")
                 .id(summary.decisionId().toString())
                 .data(summary, MediaType.APPLICATION_JSON)));
+    }
+
+    /**
+     * A different rule set version went live (published or rolled back). Every open console is
+     * told, as an event named "rules", so the Live page can say so the moment it happens.
+     */
+    @EventListener
+    public void onRulesChanged(RuleSetActivated event) {
+        if (emitters.isEmpty()) {
+            return;
+        }
+        sender.execute(() -> broadcast(() -> SseEmitter.event()
+                .name("rules")
+                .data(event, MediaType.APPLICATION_JSON)));
     }
 
     @Scheduled(fixedRate = 20_000)

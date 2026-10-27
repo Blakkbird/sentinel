@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router";
-import { Pause, Play, TriangleAlert } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Pause, Play, ScrollText, TriangleAlert, X } from "lucide-react";
+import type { RuleSetActivated } from "@/lib/types";
 import { useLiveDecisions, type FeedStatus } from "@/hooks/useLiveDecisions";
 import { PageHeader } from "@/components/PageHeader";
 import { DecisionTape } from "@/components/DecisionTape";
@@ -17,7 +20,13 @@ const STATUS: Record<FeedStatus, { label: string; dot: string }> = {
 };
 
 export function LivePage() {
-  const feed = useLiveDecisions();
+  const queryClient = useQueryClient();
+  const [rulesChange, setRulesChange] = useState<RuleSetActivated | null>(null);
+  const feed = useLiveDecisions(200, (event) => {
+    setRulesChange(event);
+    void queryClient.invalidateQueries({ queryKey: ["rule-sets"] });
+    void queryClient.invalidateQueries({ queryKey: ["rule-set"] });
+  });
   const now = useNow(5000);
 
   const perMinute = feed.items.filter((d) => now - new Date(d.decidedAt).getTime() < 60_000).length;
@@ -44,6 +53,31 @@ export function LivePage() {
           </>
         }
       />
+
+      {rulesChange && (
+        <div role="status" className="mb-5 flex items-start gap-3 rounded-md border border-foreground/40 bg-card px-4 py-3">
+          <ScrollText className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              {rulesChange.kind === "PUBLISH"
+                ? `Rules version ${rulesChange.version} is live`
+                : `Rolled back: rules version ${rulesChange.version} is live again`}
+            </p>
+            <p className="text-muted-foreground">
+              {rulesChange.kind === "PUBLISH"
+                ? `Published by ${rulesChange.byName}: ${rulesChange.title}. It replaced version ${rulesChange.replaced}.`
+                : `${rulesChange.byName} made it live again, replacing version ${rulesChange.replaced}.`}{" "}
+              <Link to={`/rules/${rulesChange.version}?tab=changes`} className="text-foreground underline underline-offset-4">
+                See what changed
+              </Link>
+            </p>
+          </div>
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => setRulesChange(null)} title="Dismiss">
+            <X aria-hidden="true" />
+            <span className="sr-only">Dismiss</span>
+          </Button>
+        </div>
+      )}
 
       {degraded && (
         <div role="status" className="mb-5 flex items-start gap-3 rounded-md border border-stepup/50 bg-card px-4 py-3">
