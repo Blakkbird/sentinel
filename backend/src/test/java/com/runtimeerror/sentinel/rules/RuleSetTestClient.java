@@ -22,29 +22,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Changes are POST or PUT, so each one carries a CSRF token (csrf()), exactly as the console's
  * own requests do. user(...) pretends someone is signed in, with the roles given.
  */
-final class RuleSetTestClient {
+public final class RuleSetTestClient {
 
-    static final RequestPostProcessor NEHA = user("neha").roles("ANALYST");
-    static final RequestPostProcessor RAVI = user("ravi").roles("ANALYST");
-    static final RequestPostProcessor ARJUN = user("arjun").roles("ADMIN");
-    static final RequestPostProcessor MEERA = user("meera").roles("ADMIN");
+    public static final RequestPostProcessor NEHA = user("neha").roles("ANALYST");
+    public static final RequestPostProcessor RAVI = user("ravi").roles("ANALYST");
+    public static final RequestPostProcessor ARJUN = user("arjun").roles("ADMIN");
+    public static final RequestPostProcessor MEERA = user("meera").roles("ADMIN");
 
     private final MockMvc mvc;
     private final ObjectMapper json;
 
-    RuleSetTestClient(MockMvc mvc, ObjectMapper json) {
+    public RuleSetTestClient(MockMvc mvc, ObjectMapper json) {
         this.mvc = mvc;
         this.json = json;
     }
 
     /** Starts a draft from the live version and returns it. */
-    JsonNode create(RequestPostProcessor who) throws Exception {
+    public JsonNode create(RequestPostProcessor who) throws Exception {
         return read(mvc.perform(post("/api/rule-sets").with(who).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isCreated()));
     }
 
-    ResultActions save(RequestPostProcessor who, int version, int revision, String title, ArrayNode rules) throws Exception {
+    public ResultActions save(RequestPostProcessor who, int version, int revision, String title, ArrayNode rules) throws Exception {
         ObjectNode body = json.createObjectNode();
         body.put("revision", revision);
         body.put("title", title);
@@ -54,29 +54,29 @@ final class RuleSetTestClient {
     }
 
     /** POST /api/rule-sets/{version}/{step}, for discard, submit, approve and the rest. */
-    ResultActions step(RequestPostProcessor who, int version, String step, String body) throws Exception {
+    public ResultActions step(RequestPostProcessor who, int version, String step, String body) throws Exception {
         return mvc.perform(post("/api/rule-sets/" + version + "/" + step).with(who).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
-    JsonNode get(RequestPostProcessor who, String path) throws Exception {
+    public JsonNode get(RequestPostProcessor who, String path) throws Exception {
         return read(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
                         .with(who))
                 .andExpect(status().isOk()));
     }
 
-    JsonNode read(ResultActions result) throws Exception {
+    public JsonNode read(ResultActions result) throws Exception {
         return json.readTree(result.andReturn().getResponse().getContentAsString());
     }
 
     /** A draft whose rules are copied and then edited: takes a version's rules, ready to send back. */
-    static ArrayNode rulesOf(JsonNode detail) {
+    public static ArrayNode rulesOf(JsonNode detail) {
         ArrayNode rules = detail.get("rules").deepCopy();
         rules.forEach(rule -> ((ObjectNode) rule).remove("conditionText"));   // a view-only field
         return rules;
     }
 
-    static ArrayNode withMode(JsonNode detail, String code, String mode) {
+    public static ArrayNode withMode(JsonNode detail, String code, String mode) {
         ArrayNode rules = rulesOf(detail);
         rules.forEach(rule -> {
             if (rule.get("code").asText().equals(code)) {
@@ -86,7 +86,7 @@ final class RuleSetTestClient {
         return rules;
     }
 
-    static JsonNode rule(JsonNode detail, String code) {
+    public static JsonNode rule(JsonNode detail, String code) {
         for (JsonNode rule : detail.get("rules")) {
             if (rule.get("code").asText().equals(code)) {
                 return rule;
@@ -95,7 +95,7 @@ final class RuleSetTestClient {
         throw new AssertionError("no rule " + code + " in " + detail);
     }
 
-    static JsonNode permission(JsonNode detail, String action) {
+    public static JsonNode permission(JsonNode detail, String action) {
         for (JsonNode permission : detail.get("permissions")) {
             if (permission.get("action").asText().equals(action)) {
                 return permission;
@@ -104,11 +104,11 @@ final class RuleSetTestClient {
         throw new AssertionError("no permission " + action + " in " + detail);
     }
 
-    static int version(JsonNode detail) {
+    public static int version(JsonNode detail) {
         return detail.get("version").asInt();
     }
 
-    static int revision(JsonNode detail) {
+    public static int revision(JsonNode detail) {
         return detail.get("revision").asInt();
     }
 }

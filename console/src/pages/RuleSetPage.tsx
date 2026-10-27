@@ -9,6 +9,7 @@ import { permission, useCreateDraft, useFeatures, useRuleSet, useRuleSetStep, us
 import { RuleBuilder } from "@/components/rules/RuleBuilder";
 import { RuleCards } from "@/components/rules/RuleCards";
 import { RuleDiff } from "@/components/rules/RuleDiff";
+import { RuleLabPanel } from "@/components/rules/RuleLabPanel";
 import { StatusBadge } from "@/components/rules/StatusBadge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Tabs } from "@/components/Tabs";
@@ -18,8 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Tab = "rules" | "changes";
-const TABS: Tab[] = ["rules", "changes"];
+type Tab = "rules" | "changes" | "lab";
+const TABS: Tab[] = ["rules", "changes", "lab"];
 
 /** One version of the rules. A draft opens in the rule builder for its author; anything else is read-only. */
 export function RuleSetPage() {
@@ -168,6 +169,7 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
         items={[
           { value: "rules", label: "Rules" },
           { value: "changes", label: "Changes" },
+          { value: "lab", label: "Rule Lab" },
         ]}
       />
 
@@ -184,6 +186,7 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
           <RuleCards rules={d.rules} />
         ))}
       {tab === "changes" && <ChangesTab d={d} current={current} />}
+      {tab === "lab" && <RuleLabPanel d={d} unsavedEdits={editable && dirty} />}
       {tab === "rules" && !editable && <LivePeriods d={d} />}
 
       {editable && dirty && (
