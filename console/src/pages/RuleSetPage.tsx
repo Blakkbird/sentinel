@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
-import { ArrowLeft, Copy, LoaderCircle, Save, Trash2, Undo2 } from "lucide-react";
+import { ArrowLeft, Ban, Copy, FilePlus2, Info, LoaderCircle, RotateCcw, Save, Send, ShieldCheck, Trash2, TriangleAlert, Undo2 } from "lucide-react";
 import { ApiError } from "@/lib/api";
 import type { RuleSetDetail } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
@@ -18,6 +18,8 @@ import { EmptyState, ErrorState } from "@/components/States";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useCurrentUser } from "@/auth/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Tab = "rules" | "changes" | "lab" | "history";
@@ -67,7 +69,10 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
   const [title, setTitle] = useState(d.title);
   const [rules, setRules] = useState<EditableRule[]>(() => d.rules.map(toEditable));
   const [dirty, setDirty] = useState(false);
-  const [confirming, setConfirming] = useState<"discard" | null>(null);
+  const [confirming, setConfirming] = useState<"discard" | "approve" | "reject" | "activate" | null>(null);
+  const [note, setNote] = useState("");
+  const me = useCurrentUser().data;
+  const isAdmin = me?.role === "ADMIN";
 
   const features = useFeatures();
   const save = useSaveDraft(d.version);
@@ -130,22 +135,57 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
         actions={
           editable ? (
             <>
-              <Button onClick={saveNow} disabled={!dirty || problemCount > 0 || save.isPending}>
+              <Button variant={dirty ? "default" : "outline"} onClick={saveNow} disabled={!dirty || problemCount > 0 || save.isPending}>
                 {save.isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
                 Save changes
               </Button>
+              <Button
+                variant={dirty ? "outline" : "default"}
+                onClick={() => step.mutate({ step: "submit", body: { revision: d.revision } })}
+                disabled={!permission(d, "SUBMIT").allowed || dirty || step.isPending}
+                title={dirty ? "Save your changes first" : (permission(d, "SUBMIT").reason ?? undefined)}
+              >
+                <Send aria-hidden="true" />
+                Send for approval
+              </Button>
               {permission(d, "DISCARD").allowed && (
-                <Button variant="outline" onClick={() => setConfirming("discard")}>
+                <Button variant="ghost" onClick={() => setConfirming("discard")}>
                   <Trash2 aria-hidden="true" />
-                  Discard draft
+                  Discard
                 </Button>
               )}
             </>
           ) : (
-            <Button variant="outline" onClick={() => copy.mutate({ from: d.version })} disabled={copy.isPending}>
-              <Copy aria-hidden="true" />
-              Copy into a new draft
-            </Button>
+            <>
+              {permission(d, "APPROVE").allowed && (
+                <Button onClick={() => setConfirming("approve")}>
+                  <ShieldCheck aria-hidden="true" />
+                  Approve and publish
+                </Button>
+              )}
+              {permission(d, "REJECT").allowed && (
+                <Button variant="outline" onClick={() => setConfirming("reject")}>
+                  <Ban aria-hidden="true" />
+                  Reject
+                </Button>
+              )}
+              {permission(d, "WITHDRAW").allowed && (
+                <Button variant="outline" onClick={() => step.mutate({ step: "withdraw" })} disabled={step.isPending}>
+                  <Undo2 aria-hidden="true" />
+                  Take back to change it
+                </Button>
+              )}
+              {permission(d, "ACTIVATE").allowed && (
+                <Button onClick={() => setConfirming("activate")}>
+                  <RotateCcw aria-hidden="true" />
+                  {d.version < d.liveVersion ? `Roll back to version ${d.version}` : `Make version ${d.version} live`}
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => copy.mutate({ from: d.version })} disabled={copy.isPending}>
+                <Copy aria-hidden="true" />
+                Copy into a new draft
+              </Button>
+            </>
           )
         }
       />
@@ -162,7 +202,8 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
         </div>
       )}
       {copy.isError && <ErrorState error={copy.error} />}
-      {step.isError && <ErrorState error={step.error} />}
+      {step.isError && confirming === null && <ErrorState error={step.error} />}
+      <Notices d={d} editable={editable} dirty={dirty} isAdmin={isAdmin} onNewDraft={() => copy.mutate({})} />
 
       <Tabs
         value={tab}
@@ -218,6 +259,53 @@ function RuleSetBody({ d }: { d: RuleSetDetail }) {
       >
         <p>It stays in the version list, marked as discarded, but nobody can edit or publish it again.</p>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirming === "approve"}
+        title={`Approve and publish version ${d.version}?`}
+        confirmLabel="Approve and publish"
+        pending={step.isPending}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() => step.mutate({ step: "approve", body: { revision: d.revision, note } }, { onSuccess: () => { setConfirming(null); setNote(""); } })}
+      >
+        <p>
+          “{d.title}”, by {d.createdByName}. It goes live for every payment the moment you confirm, replacing version{" "}
+          {d.liveVersion}. If anything goes wrong, roll back in one click from the Rules page.
+        </p>
+        <p className="text-muted-foreground">Check the Changes and Rule Lab tabs first if you have not.</p>
+        <NoteField value={note} onChange={setNote} label="Note for the record (optional)" />
+        {step.isError && <ErrorState error={step.error} />}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirming === "reject"}
+        title={`Reject version ${d.version}?`}
+        confirmLabel="Reject"
+        pending={step.isPending}
+        confirmDisabled={note.trim() === ""}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() => step.mutate({ step: "reject", body: { revision: d.revision, note } }, { onSuccess: () => { setConfirming(null); setNote(""); } })}
+      >
+        <p>Say why, so {d.createdByName} knows what to change. The version stays on record as rejected.</p>
+        <NoteField value={note} onChange={setNote} label="Reason" />
+        {step.isError && <ErrorState error={step.error} />}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirming === "activate"}
+        title={d.version < d.liveVersion ? `Roll back to version ${d.version}?` : `Make version ${d.version} live?`}
+        confirmLabel={d.version < d.liveVersion ? "Roll back" : "Make it live"}
+        pending={step.isPending}
+        onCancel={() => setConfirming(null)}
+        onConfirm={() => step.mutate({ step: "activate", body: { note } }, { onSuccess: () => { setConfirming(null); setNote(""); } })}
+      >
+        <p>
+          Version {d.version} replaces version {d.liveVersion} for every payment from the moment you confirm. It was
+          approved when it was first published, so this needs no second approval, but it is recorded in the audit log.
+        </p>
+        <NoteField value={note} onChange={setNote} label="Why (optional, for the record)" />
+        {step.isError && <ErrorState error={step.error} />}
+      </ConfirmDialog>
     </article>
   );
 }
@@ -260,4 +348,83 @@ function ChangesTab({ d, current }: { d: RuleSetDetail; current: RuleShape[] }) 
   if (base.isError) return <ErrorState error={base.error} onRetry={() => base.refetch()} />;
   if (!base.data) return <Skeleton className="h-48 w-full" />;
   return <RuleDiff before={base.data.rules} after={current} beforeVersion={d.basedOn} />;
+}
+
+function NoteField({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="review-note">{label}</Label>
+      <Textarea id="review-note" rows={3} maxLength={500} value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+/** The few things worth saying above the tabs, depending on where this version is and who is looking. */
+function Notices({
+  d,
+  editable,
+  dirty,
+  isAdmin,
+  onNewDraft,
+}: {
+  d: RuleSetDetail;
+  editable: boolean;
+  dirty: boolean;
+  isAdmin: boolean;
+  onNewDraft: () => void;
+}) {
+  const inProgress = d.status === "DRAFT" || d.status === "PENDING";
+  const stale = inProgress && d.basedOn !== null && d.basedOn !== d.liveVersion;
+  const approve = permission(d, "APPROVE");
+  const submit = permission(d, "SUBMIT");
+
+  if (stale) {
+    return (
+      <Notice tone="warn">
+        <p className="font-medium">Version {d.liveVersion} went live after this draft was started</p>
+        <p className="text-muted-foreground">
+          This draft changes version {d.basedOn}, so publishing it would quietly undo what changed in version{" "}
+          {d.liveVersion}. It cannot be approved as it is. Start a new draft from version {d.liveVersion} and make the
+          change there.
+        </p>
+        <Button variant="outline" size="sm" className="mt-2" onClick={onNewDraft}>
+          <FilePlus2 aria-hidden="true" />
+          New draft from version {d.liveVersion}
+        </Button>
+      </Notice>
+    );
+  }
+  if (d.status === "PENDING" && !approve.allowed) {
+    return (
+      <Notice>
+        <p className="font-medium">Waiting for approval</p>
+        <p className="text-muted-foreground">
+          {isAdmin && approve.reason
+            ? approve.reason
+            : "An admin reviews what changed and the Rule Lab result, then approves or rejects it. Until then it cannot be edited."}
+        </p>
+      </Notice>
+    );
+  }
+  if (editable && !dirty && !submit.allowed && submit.reason) {
+    return (
+      <Notice>
+        <p className="text-muted-foreground">{submit.reason}</p>
+      </Notice>
+    );
+  }
+  return null;
+}
+
+function Notice({ tone, children }: { tone?: "warn"; children: ReactNode }) {
+  return (
+    <div role="status" className={`flex items-start gap-3 rounded-md border bg-card px-4 py-3 ${tone === "warn" ? "border-stepup/50" : ""}`}>
+      {tone === "warn" ? (
+        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-stepup" aria-hidden="true" />
+      ) : (
+        <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      )}
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
 }

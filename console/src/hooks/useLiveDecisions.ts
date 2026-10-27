@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { DecisionPage, DecisionSummary } from "@/lib/types";
+import type { DecisionPage, DecisionSummary, RuleSetActivated } from "@/lib/types";
 
 export type FeedStatus = "connecting" | "live" | "reconnecting" | "closed";
 
@@ -13,8 +13,11 @@ export type FeedStatus = "connecting" | "live" | "reconnecting" | "closed";
  *    The browser's EventSource reconnects by itself if the connection drops.
  *
  * While paused, new decisions are held back and shown when the feed resumes.
+ *
+ * The same stream also says when a different rule set version goes live (an event named
+ * "rules"); onRules is called with it.
  */
-export function useLiveDecisions(max = 200) {
+export function useLiveDecisions(max = 200, onRules?: (event: RuleSetActivated) => void) {
   const [items, setItems] = useState<DecisionSummary[]>([]);
   const [status, setStatus] = useState<FeedStatus>("connecting");
   const [paused, setPaused] = useState(false);
@@ -23,6 +26,11 @@ export function useLiveDecisions(max = 200) {
   const pausedRef = useRef(false);
   const heldRef = useRef<DecisionSummary[]>([]);
   const arrivedLive = useRef(new Set<string>());
+  // The latest callback, kept in a ref so a new function on each render does not reconnect the stream.
+  const onRulesRef = useRef(onRules);
+  useEffect(() => {
+    onRulesRef.current = onRules;
+  });
 
   const add = useCallback(
     (incoming: DecisionSummary[], live: boolean) => {
@@ -71,6 +79,9 @@ export function useLiveDecisions(max = 200) {
       } else {
         add([decision], true);
       }
+    });
+    source.addEventListener("rules", (event) => {
+      onRulesRef.current?.(JSON.parse((event as MessageEvent<string>).data) as RuleSetActivated);
     });
     source.onopen = () => setStatus("live");
     source.onerror = () => {

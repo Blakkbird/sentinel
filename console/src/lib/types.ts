@@ -152,7 +152,7 @@ export interface RuleSetActivation {
 }
 
 /** Something a person can do to a version. The server says which are allowed, and why not. */
-export type RuleSetAction = "EDIT" | "DISCARD";
+export type RuleSetAction = "EDIT" | "DISCARD" | "SUBMIT" | "WITHDRAW" | "APPROVE" | "REJECT" | "ACTIVATE";
 
 export interface Permission {
   action: RuleSetAction;
@@ -239,4 +239,13 @@ export interface ReplayReport {
   liveStrip: string;
   versionStrip: string;
   check: { checked: number; matched: number; unknownVersion: number };
+}
+
+/** Sent over the live feed when a different version goes live. */
+export interface RuleSetActivated {
+  version: number;
+  replaced: number;
+  kind: "PUBLISH" | "ROLLBACK";
+  byName: string;
+  title: string;
 }

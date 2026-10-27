@@ -115,6 +115,43 @@ public class RuleSetStore {
                 """, utc(at), version) == 1;
     }
 
+    /** Draft to waiting-for-approval, only at the revision the author was looking at. */
+    public boolean submit(int version, int expectedRevision, Instant at) {
+        return jdbc.update("""
+                update rule_set set status = 'PENDING', submitted_at = ?, updated_at = ?
+                where version = ? and status = 'DRAFT' and revision = ?
+                """, utc(at), utc(at), version, expectedRevision) == 1;
+    }
+
+    /** Waiting-for-approval back to draft, so its author can change it. */
+    public boolean withdraw(int version, Instant at) {
+        return jdbc.update("""
+                update rule_set set status = 'DRAFT', submitted_at = null, updated_at = ?
+                where version = ? and status = 'PENDING'
+                """, utc(at), version) == 1;
+    }
+
+    /**
+     * An admin's decision on a pending version: PUBLISHED or REJECTED. Only applies if it is
+     * still pending at the revision the admin reviewed, so they approve exactly what they saw.
+     */
+    public boolean review(int version, int expectedRevision, RuleSetStatus outcome, Actor reviewer, String note, Instant at) {
+        return jdbc.update("""
+                update rule_set
+                set status = ?, reviewed_by = ?, reviewed_by_name = ?, reviewed_at = ?, review_note = ?, updated_at = ?
+                where version = ? and status = 'PENDING' and revision = ?
+                """, outcome.name(), reviewer.username(), reviewer.displayName(), utc(at), note, utc(at),
+                version, expectedRevision) == 1;
+    }
+
+    /** Records that a version went live. The newest row is always the live version. */
+    public void insertActivation(int version, RuleSetActivation.Kind kind, Actor actor, Instant at) {
+        jdbc.update("""
+                insert into rule_set_activation (version, kind, activated_by, activated_by_name, activated_at)
+                values (?, ?, ?, ?, ?)
+                """, version, kind.name(), actor.username(), actor.displayName(), utc(at));
+    }
+
     private String toJson(List<RuleDefinition> rules) {
         try {
             return json.writeValueAsString(RuleSetJson.write(rules));

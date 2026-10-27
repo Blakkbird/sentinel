@@ -69,6 +69,11 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
+                        // Approving, rejecting and changing the live rules are for admins. The
+                        // service checks again (and adds maker-checker); this line makes sure an
+                        // analyst's request never even reaches it.
+                        .requestMatchers(HttpMethod.POST, "/api/rule-sets/*/approve", "/api/rule-sets/*/reject",
+                                "/api/rule-sets/*/activate").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .csrf(csrf -> csrf

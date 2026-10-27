@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { useNavigate } from "react-router";
 import type { DecisionSummary, Outcome } from "@/lib/types";
 import { formatClock, formatMoney } from "@/lib/format";
@@ -29,9 +30,12 @@ export function DecisionTape({ items, capacity = 160 }: { items: DecisionSummary
           </p>
         ) : (
           <div aria-hidden="true" className="absolute inset-x-3 top-3 bottom-3 flex items-end justify-end gap-[2px] overflow-hidden">
-            {visible.map((d) => (
+            {visible.map((d, i) => (
+              <Fragment key={d.decisionId}>
+                {/* Where the rule set version changes, a thin line and the new version's number:
+                    a publish or a rollback shows up right where it happened. */}
+                {i > 0 && visible[i - 1].ruleSetVersion !== d.ruleSetVersion && <VersionMark version={d.ruleSetVersion} />}
               <span
-                key={d.decisionId}
                 onClick={() => navigate(`/decisions/${encodeURIComponent(d.transactionId)}`)}
                 title={`${OUTCOME[d.outcome].label}, ${formatMoney(d.amountMinor, d.currency)}, ${d.cardId}, ${formatClock(d.decidedAt)}`}
                 className={cn("w-[4px] shrink-0 cursor-pointer rounded-[1px] hover:opacity-70", OUTCOME[d.outcome].bg)}
@@ -41,6 +45,7 @@ export function DecisionTape({ items, capacity = 160 }: { items: DecisionSummary
                   boxShadow: d.shadowOutcome !== d.outcome ? "inset 0 4px 0 var(--shadow)" : undefined,
                 }}
               />
+              </Fragment>
             ))}
           </div>
         )}
@@ -57,6 +62,9 @@ export function DecisionTape({ items, capacity = 160 }: { items: DecisionSummary
             <span className="text-muted-foreground">{OUTCOME[outcome].label.toLowerCase()}</span>
           </span>
         ))}
+        {visible.length > 0 && (
+          <span className="text-muted-foreground">Rules version {visible[visible.length - 1].ruleSetVersion}</span>
+        )}
         {shadowDiffers > 0 && (
           <span className="inline-flex items-center gap-1.5 text-shadow">
             <span className="size-2.5 rounded-[2px] bg-shadow" aria-hidden="true" />
@@ -66,6 +74,16 @@ export function DecisionTape({ items, capacity = 160 }: { items: DecisionSummary
         )}
       </div>
     </section>
+  );
+}
+
+function VersionMark({ version }: { version: number }) {
+  return (
+    <span className="relative w-px shrink-0 self-stretch bg-foreground/60" title={`Rules version ${version} from here`}>
+      <span className="absolute top-0 left-1 rounded-sm bg-card px-0.5 text-[10px] leading-none font-semibold whitespace-nowrap text-foreground">
+        v{version}
+      </span>
+    </span>
   );
 }
 
