@@ -12,12 +12,20 @@
 export class ApiError extends Error {
   readonly status: number;
   readonly title: string;
+  /** Every problem the server listed, for example each mistake in a rule set. Often empty. */
+  readonly problems: string[];
 
-  constructor(status: number, title: string, detail: string) {
+  constructor(status: number, title: string, detail: string, problems: string[] = []) {
     super(detail);
     this.status = status;
     this.title = title;
+    this.problems = problems;
   }
+}
+
+/** Options for sending a JSON body: api(path, json("PUT", { ... })). */
+export function json(method: "POST" | "PUT", body: unknown): RequestInit {
+  return { method, body: JSON.stringify(body), headers: { "Content-Type": "application/json" } };
 }
 
 function readCookie(name: string): string | null {
@@ -69,12 +77,11 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const problem = (body ?? {}) as { title?: string; detail?: string };
-    throw new ApiError(
-      response.status,
-      problem.title ?? response.statusText,
-      problem.detail ?? "The request failed.",
-    );
+    const problem = (body ?? {}) as { title?: string; detail?: string; problems?: unknown };
+    const problems = Array.isArray(problem.problems)
+      ? problem.problems.filter((p): p is string => typeof p === "string")
+      : [];
+    throw new ApiError(response.status, problem.title ?? response.statusText, problem.detail ?? "The request failed.", problems);
   }
   return body as T;
 }

@@ -6,9 +6,11 @@ import com.runtimeerror.sentinel.engine.RuleMode;
 import com.runtimeerror.sentinel.rules.RuleSetActivation;
 import com.runtimeerror.sentinel.rules.RuleSetJson;
 import com.runtimeerror.sentinel.rules.RuleSetNotFoundException;
+import com.runtimeerror.sentinel.rules.RuleSetService;
 import com.runtimeerror.sentinel.rules.RuleSetStatus;
 import com.runtimeerror.sentinel.rules.RuleSetStore;
 import com.runtimeerror.sentinel.rules.StoredRuleSet;
+import com.runtimeerror.sentinel.security.Actor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -64,7 +66,10 @@ public class RuleSetViews {
         }
     }
 
-    /** Everything about one version. */
+    /**
+     * Everything about one version, for one person: "permissions" says which actions this
+     * person may take on it now, and why not where they may not.
+     */
     public record Detail(
             int version,
             RuleSetStatus status,
@@ -83,14 +88,17 @@ public class RuleSetViews {
             boolean live,
             int liveVersion,
             List<Rule> rules,
-            List<RuleSetActivation> activations
+            List<RuleSetActivation> activations,
+            List<RuleSetService.Permission> permissions
     ) {
     }
 
     private final RuleSetStore store;
+    private final RuleSetService service;
 
-    public RuleSetViews(RuleSetStore store) {
+    public RuleSetViews(RuleSetStore store, RuleSetService service) {
         this.store = store;
+        this.service = service;
     }
 
     public Listing list() {
@@ -102,7 +110,7 @@ public class RuleSetViews {
         return new Listing(live, previous, items);
     }
 
-    public Detail detail(int version) {
+    public Detail detail(int version, Actor viewer) {
         StoredRuleSet rs = store.find(version).orElseThrow(() -> new RuleSetNotFoundException(version));
         int live = liveVersion();
         return new Detail(rs.version(), rs.status(), rs.title(), rs.basedOn(), rs.revision(),
@@ -110,7 +118,8 @@ public class RuleSetViews {
                 rs.reviewedBy(), rs.reviewedByName(), rs.reviewedAt(), rs.reviewNote(),
                 rs.version() == live, live,
                 rs.rules().stream().map(Rule::of).toList(),
-                store.activationsOf(version));
+                store.activationsOf(version),
+                service.permissions(rs, viewer));
     }
 
     int liveVersion() {

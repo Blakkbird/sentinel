@@ -1,28 +1,23 @@
 import { Link } from "react-router";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { RuleSetDetail, RuleSetListing } from "@/lib/types";
+import { FilePlus2, LoaderCircle } from "lucide-react";
+import type { RuleSetDetail } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 import { RuleCards } from "@/components/rules/RuleCards";
 import { VersionList } from "@/components/rules/VersionList";
 import { ErrorState } from "@/components/States";
 import { useNow } from "@/components/Time";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCreateDraft, useRuleSet, useRuleSetListing } from "@/hooks/useRuleSets";
 
 /** The live rules, and every version there has been. */
 export function RulesPage() {
   const now = useNow(30_000);
-  const listing = useQuery({
-    queryKey: ["rule-sets"],
-    queryFn: () => api<RuleSetListing>("/api/rule-sets"),
-  });
+  const listing = useRuleSetListing();
   const liveVersion = listing.data?.liveVersion;
-  const live = useQuery({
-    queryKey: ["rule-set", liveVersion],
-    queryFn: () => api<RuleSetDetail>(`/api/rule-sets/${liveVersion}`),
-    enabled: liveVersion !== undefined,
-  });
+  const live = useRuleSet(liveVersion);
+  const create = useCreateDraft();
 
   return (
     <>
@@ -33,7 +28,18 @@ export function RulesPage() {
             ? `Version ${liveVersion} is live. Active rules decide; shadow rules only record what they would have done.`
             : "The rules every payment is checked against."
         }
+        actions={
+          <Button onClick={() => create.mutate({})} disabled={create.isPending}>
+            {create.isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <FilePlus2 aria-hidden="true" />}
+            New draft
+          </Button>
+        }
       />
+      {create.isError && (
+        <div className="mb-5">
+          <ErrorState error={create.error} />
+        </div>
+      )}
 
       {listing.isPending && <Skeleton className="h-72 w-full" />}
       {listing.isError && <ErrorState error={listing.error} onRetry={() => listing.refetch()} />}
