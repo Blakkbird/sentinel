@@ -27,6 +27,11 @@ Applications · TIET
 - Keeps deciding in degraded mode if Redis is unavailable; refuses (503) if the database is down.
 - A web console: sign-in with roles, a live feed with a decision tape, search across every decision,
   and a page that explains any decision rule by rule, with the exact facts the rules saw.
+- Rules live in the database as versioned JSON. Analysts change them in a rule builder, without code.
+- The Rule Lab replays a draft on recent decisions and shows exactly which outcomes would change,
+  before anything goes live.
+- Maker-checker approval: an admin who did not write a change approves it, and it goes live at once
+  with no restart. Rolling back is one click. Every step is in an audit log nobody can edit.
 - `simulator/traffic.py` sends ordinary traffic and three attacks: card testing, card enumeration and
   account takeover.
 - Unit and integration tests, run by GitHub Actions on every push and pull request.
@@ -40,7 +45,7 @@ The evaluation version comes first: features you can see and explain. The deeper
 |---|---|
 | 0 | Setup: Neon, CI, a console skeleton |
 | 1 | See every decision: sign-in with roles, API keys, decision explorer, live feed, new fraud signals, attack scenarios |
-| 2 | Change rules safely: rules in the database, versions, publish and rollback, rule builder, Rule Lab (test a rule on past decisions), approvals, audit log |
+| 2 | Change rules safely: rules in the database, versions, publish and rollback, rule builder, Rule Lab (test a rule on past decisions), approvals, audit log (done) |
 | 3 | Analyst workflow and polish: dashboard, case queue, fraud labels, screenshots, demo rehearsal |
 | After exams | Hardening: concurrency-safe retries, finer windows, circuit breaker, load tests, an ML score |
 
@@ -164,6 +169,14 @@ environment variables in brackets before deploying anywhere.
 - **Simulator**, from the repo root: `python simulator/traffic.py` (Windows: `py simulator\traffic.py`).
   Add `normal`, `card-testing`, `enumeration` or `takeover` for the other scenarios (see `simulator/README.md`).
 - **Health check:** http://localhost:8080/actuator/health
+- **Change a rule safely** (two browsers, or one normal and one private window):
+  1. As `analyst`: Rules → New draft. Set `DEVICE_MANY_CARDS_1H` to Active, give it a title, save.
+  2. Open the Rule Lab tab: it replays recent decisions and shows which ones would now be declined.
+  3. Send for approval. As `admin`, in the other window: open it, check Changes and Rule Lab, then
+     Approve and publish. The analyst's Live page says the new version is live, and the tape marks it.
+  4. `py simulator\traffic.py enumeration` is now declined from the fifth card. Rules → Roll back
+     undoes it in one click. The Audit page shows every step and who took it.
+- **Maker-checker:** nobody approves their own change. An admin's own draft needs a second admin.
 
 ### Troubleshooting
 
@@ -189,9 +202,13 @@ sentinel/
 │       ├── main/java/com/runtimeerror/sentinel/
 │       │   ├── engine/          the decision logic: plain Java, no Spring, no database
 │       │   ├── features/        builds the facts about a payment (Redis counters)
-│       │   ├── rules/           the starter rules and the rule set in use
+│       │   ├── rules/           rule set versions: JSON format, storage, the live set, the approval workflow
+│       │   ├── lab/             Rule Lab: replays past decisions through a version
+│       │   ├── audit/           the append-only audit log
 │       │   ├── decision/        the decision flow and saving to Postgres
-│       │   ├── api/             HTTP endpoints, response shapes, error handling
+│       │   ├── console/         what the web console calls: search, decision pages, live feed, rule sets
+│       │   ├── security/        sign-in, roles, API keys
+│       │   ├── api/             the /v1 endpoints, response shapes, error handling
 │       │   └── config/          hand-wired objects: clock, engine, Redis client options
 │       ├── main/resources/      application.yml (settings), db/migration (SQL)
 │       └── test/java/...        unit tests and one end-to-end test
@@ -205,8 +222,15 @@ sentinel/
 **One request, end to end:** check the JSON → if this transaction was already decided, return that
 decision → update and read the Redis counters → run the rules → save the decision to Postgres → reply.
 
-**Database:** one table so far, `decision_log`, with one row per decision: the inputs, the outcome
-and reasons, the facts the rules saw, and what each rule did. It is defined in `V1__decision_log.sql`.
+**Database** (Flyway migrations V1 to V4 in `backend/src/main/resources/db/migration`):
+
+| Table | What it holds |
+|---|---|
+| `decision_log` | One row per decision: inputs, outcome and reasons, the facts the rules saw, what each rule did |
+| `app_user`, `api_client` | Console accounts and the API keys of payment systems |
+| `rule_set` | Every version of the rules, as JSON, with its status (draft, pending, published, rejected, discarded) |
+| `rule_set_activation` | Which version was live when; the newest row is live. Append-only |
+| `audit_event` | Who did what to the rules, and when. Append-only: the database refuses edits and deletes |
 
 ## API so far
 
@@ -222,7 +246,13 @@ Payment systems call `/v1` with an `X-Api-Key` header. The console calls `/api` 
 | GET | `/api/auth/me` | Who is signed in |
 | GET | `/api/decisions` | Search decisions: `q` (any id), `outcome`, `degraded`, `shadowChanges`, `cursor`, `limit` |
 | GET | `/api/decisions/{transactionId}` | One decision, explained rule by rule |
-| GET | `/api/stream/decisions` | Live feed of new decisions (Server-Sent Events) |
+| GET | `/api/stream/decisions` | Live feed of new decisions, and of rule versions going live (Server-Sent Events) |
+| GET | `/api/rule-sets`, `/api/rule-sets/{version}` | Rule set versions, and one version with what you may do to it |
+| POST | `/api/rule-sets` | Start a draft (a copy of the live rules, or of `from`) |
+| PUT | `/api/rule-sets/{version}` | Save a draft: `revision`, `title`, `rules` |
+| POST | `/api/rule-sets/{version}/{step}` | `submit`, `withdraw`, `discard`; admins: `approve`, `reject`, `activate` (rollback) |
+| GET | `/api/rule-sets/{version}/replay?decisions=1000` | Rule Lab: this version against the live rules on recent decisions |
+| GET | `/api/audit` | The audit log, newest first |
 | GET | `/actuator/health` | Health of the app, Postgres and Redis (other actuator endpoints: admins only) |
 
 ## Working together
