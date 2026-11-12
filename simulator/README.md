@@ -18,3 +18,8 @@ local dev key), `--quiet` (summary only).
 from a second terminal. The attack appears in the live tape as it happens.
 
 It uses only Python's standard library, so there is nothing to install.
+
+**For the rule workflow demo:** run `normal` for a minute, then `enumeration`. The shadow rule
+`DEVICE_MANY_CARDS_1H` would have declined most of the bot's cards ("Shadow would change" on the
+Decisions page). Draft a version that makes it active, check it in the Rule Lab (only the bot's
+payments should change), have an admin approve it, then run `enumeration` again: declined from card 5.
