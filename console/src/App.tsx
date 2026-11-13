@@ -6,6 +6,7 @@ import { RequireAuth } from "@/auth/RequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { LoginPage } from "@/pages/LoginPage";
 import { LivePage } from "@/pages/LivePage";
+import { DashboardPage } from "@/pages/DashboardPage";
 import { DecisionsPage } from "@/pages/DecisionsPage";
 import { DecisionDetailPage } from "@/pages/DecisionDetailPage";
 import { RulesPage } from "@/pages/RulesPage";
@@ -47,6 +48,7 @@ export function App() {
           >
             <Route index element={<Navigate to="/live" replace />} />
             <Route path="/live" element={<LivePage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/decisions" element={<DecisionsPage />} />
             <Route path="/decisions/:transactionId" element={<DecisionDetailPage />} />
             <Route path="/rules" element={<RulesPage />} />
