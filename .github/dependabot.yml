@@ -1,0 +1,49 @@
+# Dependabot: GitHub's bot that opens a pull request when a library we use has a newer
+# version. Each block below is one place it looks. Its pull requests go through CI and
+# review like anyone else's; nothing here merges by itself.
+#
+# The same four settings repeat in every block (this file format has no way to share them):
+#   - weekly: one batch of pull requests a week is enough for three people to review.
+#   - open-pull-requests-limit 3: at most three open at a time per block, so updates never
+#     bury our own work. The bot opens the next one after we merge or close one.
+#   - cooldown 14 days: our rule is that a new version must be at least two weeks old
+#     before we take it. A broken or malicious release is usually caught and withdrawn
+#     within days, so waiting lets other people find the problem first.
+#   - The limit and the cooldown cover routine version updates only. Fixes for known
+#     security holes (Dependabot security updates, a repository setting) are not delayed.
+version: 2
+
+updates:
+  # Java libraries, read from backend/pom.xml.
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 14
+    ignore:
+      # We stay on Spring Boot 3.5.x. 3.5 is the last 3.x line, so the only way off it is
+      # a major jump to 4, which changes too much to arrive as a routine update.
+      # Bug-fix releases (3.5.16, ...) still come through.
+      - dependency-name: "org.springframework.boot:*"
+        update-types: ["version-update:semver-major"]
+
+  # Console libraries, read from console/package.json and package-lock.json.
+  - package-ecosystem: npm
+    directory: /console
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 14
+
+  # The actions our workflows use (actions/checkout and friends). The directory is "/"
+  # because for this ecosystem Dependabot looks in .github/workflows by itself.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 14

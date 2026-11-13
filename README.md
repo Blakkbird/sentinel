@@ -130,7 +130,7 @@ From the `backend` folder (in Windows PowerShell, type `.\mvnw` instead of `./mv
 ./mvnw spring-boot:run   # starts the app on http://localhost:8080
 ```
 
-- The end-to-end test needs Docker. Without Docker it is skipped on your laptop; GitHub's CI still runs it.
+- The integration tests need Docker. Without Docker they are skipped on your laptop; GitHub's CI still runs them.
 - In the app's log, look for `Redis is reachable` and `Started SentinelApplication`.
 
 ### 5. The web console
@@ -211,12 +211,12 @@ sentinel/
 │       │   ├── api/             the /v1 endpoints, response shapes, error handling
 │       │   └── config/          hand-wired objects: clock, engine, Redis client options
 │       ├── main/resources/      application.yml (settings), db/migration (SQL)
-│       └── test/java/...        unit tests and one end-to-end test
+│       └── test/java/...        unit tests, and integration tests against real Postgres and Redis
 ├── console/                     the web console (React, TypeScript, Vite, Tailwind)
 │   └── src/                     pages/, components/, lib/ (API client, formatting)
 ├── simulator/                   Python script that sends test payments
 ├── ops/                         optional Docker setup for Postgres and Redis
-└── .github/                     CI workflow and pull request template
+└── .github/                     CI workflow, Dependabot settings and pull request template
 ```
 
 **One request, end to end:** check the JSON → if this transaction was already decided, return that

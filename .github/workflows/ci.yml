@@ -1,6 +1,7 @@
 # Continuous integration: GitHub runs this on every push to main and on every pull
-# request. With branch protection on (Settings > Branches), a pull request cannot be
-# merged unless this passes. That one setting keeps main working for all three of us.
+# request. Branch protection is not switched on for this repository (a team choice), so
+# GitHub itself will not block a merge when this fails. Keeping main working is our own
+# rule instead: nobody merges a pull request until this run is green.
 name: ci
 
 on:
