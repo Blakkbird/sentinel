@@ -35,6 +35,22 @@ export function formatCount(value: number): string {
   return countFormat.format(value);
 }
 
+/**
+ * A part of a whole as a percentage: "92%", "0.4%". Shares under 10% and over 90% keep one
+ * decimal, because 0.4% degraded and 0% degraded are different situations. With nothing to
+ * divide by (no decisions) there is no share, so the answer is a dash, never NaN.
+ */
+export function formatShare(part: number, whole: number): string {
+  if (whole <= 0) return "–";
+  if (part <= 0) return "0%";
+  if (part >= whole) return "100%";
+  const percent = (part / whole) * 100;
+  if (percent < 0.1) return "<0.1%";
+  if (percent > 99.9) return ">99.9%";
+  const text = percent < 10 || percent > 90 ? percent.toFixed(1) : Math.round(percent).toString();
+  return text.replace(/\.0$/, "") + "%"; // "6%", not "6.0%"
+}
+
 /** Server compute time: 840 -> "0.84 ms", 12500 -> "12.5 ms". */
 export function formatMicros(micros: number): string {
   const ms = micros / 1000;
@@ -57,6 +73,26 @@ const dateTimeFormat = new Intl.DateTimeFormat("en-IN", {
   second: "2-digit",
   hour12: false,
 });
+
+const hourMinuteFormat = new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+const dayHourMinuteFormat = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** "14:05", for chart axes. */
+export function formatHourMinute(time: string | number): string {
+  return hourMinuteFormat.format(new Date(time));
+}
+
+/** "13 Nov, 14:05", for a chart that spans midnight. */
+export function formatDayHourMinute(time: string | number): string {
+  return dayHourMinuteFormat.format(new Date(time));
+}
 
 export function formatClock(iso: string): string {
   return timeFormat.format(new Date(iso));

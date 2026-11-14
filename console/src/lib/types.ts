@@ -249,3 +249,40 @@ export interface RuleSetActivated {
   byName: string;
   title: string;
 }
+
+// ---- dashboard (Sprint 3) ---------------------------------------------------------------
+
+export type DashboardWindow = "15m" | "1h" | "24h";
+
+/** One bar of the chart: the decisions made from "at" up to one bucket later. */
+export interface DashboardPoint {
+  at: string;
+  approve: number;
+  stepUp: number;
+  decline: number;
+}
+
+export interface TopRule {
+  ruleCode: string;
+  mode: RuleMode;
+  count: number;
+}
+
+/** GET /api/dashboard. Counts only; the page works out the shares. */
+export interface DashboardView {
+  window: DashboardWindow;
+  generatedAt: string;
+  bucketSeconds: number;
+  totals: {
+    decisions: number;
+    approve: number;
+    stepUp: number;
+    decline: number;
+    degraded: number;
+    shadowChanges: number;
+  };
+  /** Both null when the window holds no decisions. */
+  computeMicros: { p50: number | null; p95: number | null };
+  series: DashboardPoint[];
+  topRules: TopRule[];
+}

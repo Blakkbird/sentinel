@@ -27,6 +27,8 @@ Applications · TIET
 - Keeps deciding in degraded mode if Redis is unavailable; refuses (503) if the database is down.
 - A web console: sign-in with roles, a live feed with a decision tape, search across every decision,
   and a page that explains any decision rule by rule, with the exact facts the rules saw.
+- A dashboard for the last 15 minutes, hour or day: how many decisions, the outcome mix, compute
+  time, decisions over time, and which rules fired most (shadow rules included).
 - Rules live in the database as versioned JSON. Analysts change them in a rule builder, without code.
 - The Rule Lab replays a draft on recent decisions and shows exactly which outcomes would change,
   before anything goes live.
@@ -206,7 +208,7 @@ sentinel/
 │       │   ├── lab/             Rule Lab: replays past decisions through a version
 │       │   ├── audit/           the append-only audit log
 │       │   ├── decision/        the decision flow and saving to Postgres
-│       │   ├── console/         what the web console calls: search, decision pages, live feed, rule sets
+│       │   ├── console/         what the web console calls: search, decision pages, dashboard, live feed, rule sets
 │       │   ├── security/        sign-in, roles, API keys
 │       │   ├── api/             the /v1 endpoints, response shapes, error handling
 │       │   └── config/          hand-wired objects: clock, engine, Redis client options
@@ -246,6 +248,7 @@ Payment systems call `/v1` with an `X-Api-Key` header. The console calls `/api` 
 | GET | `/api/auth/me` | Who is signed in |
 | GET | `/api/decisions` | Search decisions: `q` (any id), `outcome`, `degraded`, `shadowChanges`, `cursor`, `limit` |
 | GET | `/api/decisions/{transactionId}` | One decision, explained rule by rule |
+| GET | `/api/dashboard?window=15m\|1h\|24h` | Dashboard numbers for that window: totals, compute time, decisions per bucket, top rules |
 | GET | `/api/stream/decisions` | Live feed of new decisions, and of rule versions going live (Server-Sent Events) |
 | GET | `/api/rule-sets`, `/api/rule-sets/{version}` | Rule set versions, and one version with what you may do to it |
 | POST | `/api/rule-sets` | Start a draft (a copy of the live rules, or of `from`) |
