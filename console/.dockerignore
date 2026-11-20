@@ -1,0 +1,10 @@
+# Keeps the build context small. node_modules is deliberately excluded: the image installs
+# its own from package-lock.json, and a copy built on macOS or Windows can contain binaries
+# that do not run on Linux.
+node_modules/
+dist/
+Dockerfile
+.dockerignore
+.env
+.env.local
+*.log
