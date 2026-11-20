@@ -66,10 +66,46 @@ The evaluation version comes first: features you can see and explain. The deeper
 | Redis | 7 | Windows: inside WSL (Ubuntu). macOS: Homebrew. Linux: apt |
 | Node.js | 20.19 or newer (24 LTS is fine) | Only for the web console |
 | Python | 3.11 or newer | Only for the simulator |
-| Docker | optional | `ops/docker-compose.yml` can run Postgres and Redis for you instead |
+| Docker | optional, or the only thing you need | See "Everything in Docker" below |
 
 You do not need to install Maven: the project includes the Maven wrapper (`mvnw`), which downloads the
 right version the first time you use it.
+
+### Everything in Docker
+
+If you only want to see Sentinel working, this is the whole setup. Docker builds the backend and the
+console and starts them with Postgres and Redis; Java, Node, Postgres and Redis do not have to be
+installed at all. From the repo root:
+
+```bash
+docker compose up --build -d
+```
+
+The first build takes a few minutes (it downloads the Java libraries and the npm packages); later
+starts take seconds. Then:
+
+| Where | What |
+|---|---|
+| http://localhost:3000 | the console; sign in as `admin` / `sentinel-admin` |
+| http://localhost:8080/swagger-ui.html | the payment API, to try `POST /v1/decisions` |
+| http://localhost:8080/actuator/health | health check |
+
+```bash
+docker compose ps                                        what is running, and whether it is healthy
+docker compose logs -f backend                           follow the backend's log
+docker compose --profile sim run --rm simulator normal   send test payments
+docker compose up --build -d backend                     rebuild after changing Java code
+docker compose down                                      stop everything, keep the database
+docker compose down -v                                   stop everything and wipe the database
+```
+
+To change the passwords and the API key, copy `.env.example` to `.env` and edit it; `docker compose`
+reads that file by itself. Do that before running this anywhere other people can reach: the defaults
+are public, and `.env` stays out of git.
+
+The rest of this section is the other way round: installing the tools and running the app from your
+IDE, which is what you want while writing code. The two do not mix, because both use ports 5432 and
+6379 — stop one before starting the other (`docker compose down`).
 
 ### 1. Database
 
@@ -188,6 +224,14 @@ environment variables in brackets before deploying anywhere.
 - **"Redis is NOT reachable" in the log:** start Redis (`sudo service redis-server start` in WSL). The app
   keeps working meanwhile.
 - **`./mvnw: Permission denied`** (macOS/Linux): `chmod +x mvnw`.
+- **Docker: "port is already allocated":** something already uses 5432, 6379, 8080 or 3000 — often a
+  local Postgres, or `ops/docker-compose.yml` still running. Stop it, or change the left-hand number
+  in the `ports:` line in `docker-compose.yml`.
+- **Docker: the console loads but says it cannot reach the server:** the backend is still starting.
+  `docker compose ps` shows it as `health: starting` for up to a minute on the first run, while Flyway
+  applies the migrations. `docker compose logs backend` shows how far it has got.
+- **Docker: a code change does nothing:** the images hold a built copy of the code.
+  `docker compose up --build -d` rebuilds them.
 - **Anything else:** share the *first* error in the output, not the last; later errors are usually
   consequences of the first.
 
@@ -200,6 +244,7 @@ sentinel/
 ├── backend/                     the Spring Boot application (Java 21)
 │   ├── pom.xml                  build file: libraries and versions
 │   ├── mvnw, mvnw.cmd           Maven wrapper
+│   ├── Dockerfile               builds the app into a small runtime image
 │   └── src/
 │       ├── main/java/com/runtimeerror/sentinel/
 │       │   ├── engine/          the decision logic: plain Java, no Spring, no database
@@ -215,9 +260,13 @@ sentinel/
 │       ├── main/resources/      application.yml (settings), db/migration (SQL)
 │       └── test/java/...        unit tests, and integration tests against real Postgres and Redis
 ├── console/                     the web console (React, TypeScript, Vite, Tailwind)
+│   ├── Dockerfile               builds the console and serves it with nginx
+│   ├── nginx.conf               serves the built files, forwards /api to the backend
 │   └── src/                     pages/, components/, lib/ (API client, formatting)
 ├── simulator/                   Python script that sends test payments
-├── ops/                         optional Docker setup for Postgres and Redis
+├── ops/                         Docker setup for Postgres and Redis alone, for working on the code
+├── docker-compose.yml           runs the whole thing in Docker: database, counters, backend, console
+├── .env.example                 passwords and API key for that; copy to .env to change them
 └── .github/                     CI workflow, Dependabot settings and pull request template
 ```
 

@@ -1,0 +1,136 @@
+# Runs the whole of Sentinel in Docker: database, counters, backend and web console.
+# Nothing else needs to be installed, not even Java or Node.
+#
+#   docker compose up --build -d        start everything (the first build takes a few minutes)
+#   docker compose ps                   what is running, and whether it is healthy
+#   docker compose logs -f backend      follow the backend's log
+#   docker compose down                 stop everything, keep the database
+#   docker compose down -v              stop everything and wipe the database
+#
+# Then open the console at http://localhost:3000 and sign in as admin / sentinel-admin.
+#
+# Passwords and the API key come from a .env file next to this one; copy .env.example to
+# .env to change them. The defaults below are for local use only.
+#
+# To work on the code instead, with the app running from your IDE, use
+# ops/docker-compose.yml, which starts only Postgres and Redis. Run one or the other:
+# both of them use port 5432 and 6379.
+
+name: sentinel
+
+services:
+  # The decision log, rule set versions, users and the audit log.
+  postgres:
+    image: postgres:18-alpine
+    container_name: sentinel-postgres
+    environment:
+      POSTGRES_DB: sentinel
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel}
+    ports:
+      # Published so you can connect with psql or a database tool while it runs.
+      - "5432:5432"
+    volumes:
+      # A named volume, so the data outlives the container. Postgres 18 images keep their
+      # data one level up from older versions.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # The velocity counters: how many payments this card, device or customer made recently.
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel-redis
+    # Counters are rebuilt by live traffic, so there is nothing worth saving to disk.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # The Spring Boot application: the payment API on /v1, the console's own API on /api.
+  backend:
+    build:
+      context: ./backend
+    image: sentinel-backend:0.1.0
+    container_name: sentinel-backend
+    environment:
+      # Every one of these overrides a line in application.yml. Inside the Docker network
+      # the database and Redis answer to their service names, not to localhost.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sentinel
+      SPRING_DATASOURCE_USERNAME: sentinel
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-sentinel}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # The accounts and API key created on first start. Change these in .env before
+      # putting this anywhere other people can reach.
+      SENTINEL_API_KEY: ${SENTINEL_API_KEY:-dev-sentinel-key}
+      SENTINEL_ADMIN_PASSWORD: ${SENTINEL_ADMIN_PASSWORD:-sentinel-admin}
+      SENTINEL_ANALYST_PASSWORD: ${SENTINEL_ANALYST_PASSWORD:-sentinel-analyst}
+    ports:
+      # Published for the payment API, Swagger UI and the actuator endpoints. The console
+      # does not use this: it reaches the backend inside the network instead.
+      - "8080:8080"
+    depends_on:
+      # Wait for a database that is actually accepting connections, not merely started:
+      # Flyway runs its migrations the moment the app boots and would otherwise fail.
+      postgres:
+        condition: service_healthy
+      # Redis only has to exist. Without it the app still decides, in degraded mode.
+      redis:
+        condition: service_started
+    healthcheck:
+      # The readiness probe, which reports whether this instance can take traffic.
+      # 127.0.0.1, not localhost: inside the container localhost resolves to the IPv6
+      # address first, and nothing here listens on IPv6.
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      # Generous: a cold JVM, Flyway migrations and the first BCrypt hashes take a moment.
+      start_period: 60s
+      retries: 5
+    restart: unless-stopped
+
+  # The web console, built and served by nginx. It also forwards /api to the backend, so
+  # the browser sees one site on one port.
+  console:
+    build:
+      context: ./console
+    image: sentinel-console:0.1.0
+    container_name: sentinel-console
+    ports:
+      # Your laptop's 3000 to nginx's 8080 inside the container.
+      - "3000:8080"
+    depends_on:
+      - backend
+    healthcheck:
+      # 127.0.0.1 for the same reason as the backend's check above.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # Test payments. Not started by "docker compose up": it is a command you run when you
+  # want traffic, so it sits behind a profile.
+  #
+  #   docker compose --profile sim run --rm simulator normal --rate 5
+  simulator:
+    build:
+      context: ./simulator
+    image: sentinel-simulator:0.1.0
+    profiles: ["sim"]
+    environment:
+      SENTINEL_API_KEY: ${SENTINEL_API_KEY:-dev-sentinel-key}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:

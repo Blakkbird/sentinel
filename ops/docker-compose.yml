@@ -1,10 +1,14 @@
-# Optional: run Postgres and Redis in Docker instead of installing them. From the repo root:
+# Postgres and Redis only, for working on the code: the Spring app and the console run
+# outside Docker, from your IDE or ./mvnw and npm run dev, so you can debug them.
+#
+# To run the whole of Sentinel in Docker instead, use the docker-compose.yml in the repo
+# root. Only one of the two at a time: both use ports 5432 and 6379.
+#
+# From the repo root:
 #
 #   docker compose -f ops/docker-compose.yml up -d                                start Postgres + Redis
 #   docker compose -f ops/docker-compose.yml down                                 stop everything (data kept)
 #   docker compose -f ops/docker-compose.yml down -v                              stop and wipe the database
-#
-# The Spring app itself runs outside Docker, from your IDE or ./mvnw, so you can debug it.
 
 name: sentinel
 

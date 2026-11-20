@@ -1,0 +1,7 @@
+# The build context for each image is its own folder (backend/, console/, simulator/),
+# and each has its own .dockerignore. This file covers things no image should ever see.
+.git/
+.github/
+*.docx
+report-figures/
+.env
