@@ -104,8 +104,9 @@ reads that file by itself. Do that before running this anywhere other people can
 are public, and `.env` stays out of git.
 
 The rest of this section is the other way round: installing the tools and running the app from your
-IDE, which is what you want while writing code. The two do not mix, because both use ports 5432 and
-6379 — stop one before starting the other (`docker compose down`).
+IDE, which is what you want while writing code. The two mix as long as you do not run the same thing
+twice: `docker compose up -d postgres redis` starts only the database and the counters, and leaves
+ports 8080 and 3000 free for the backend and console you run yourself.
 
 ### 1. Database
 
@@ -147,7 +148,8 @@ Either way, the app creates its own tables when it first starts (Flyway migratio
 
 Check with `redis-cli ping`, which should answer `PONG`. Without Redis the app still runs, in degraded mode.
 
-**With Docker instead of steps 1 and 2:** `docker compose -f ops/docker-compose.yml up -d`
+**With Docker instead of steps 1 and 2:** `docker compose up -d postgres redis` starts those two
+and nothing else, leaving the app itself to run from your IDE.
 
 ### 3. Clone and open
 
@@ -225,7 +227,7 @@ environment variables in brackets before deploying anywhere.
   keeps working meanwhile.
 - **`./mvnw: Permission denied`** (macOS/Linux): `chmod +x mvnw`.
 - **Docker: "port is already allocated":** something already uses 5432, 6379, 8080 or 3000 — often a
-  local Postgres, or `ops/docker-compose.yml` still running. Stop it, or change the left-hand number
+  local Postgres, or an app you started from your IDE. Stop it, or change the left-hand number
   in the `ports:` line in `docker-compose.yml`.
 - **Docker: the console loads but says it cannot reach the server:** the backend is still starting.
   `docker compose ps` shows it as `health: starting` for up to a minute on the first run, while Flyway
@@ -264,7 +266,6 @@ sentinel/
 │   ├── nginx.conf               serves the built files, forwards /api to the backend
 │   └── src/                     pages/, components/, lib/ (API client, formatting)
 ├── simulator/                   Python script that sends test payments
-├── ops/                         Docker setup for Postgres and Redis alone, for working on the code
 ├── docker-compose.yml           runs the whole thing in Docker: database, counters, backend, console
 ├── .env.example                 passwords and API key for that; copy to .env to change them
 └── .github/                     CI workflow, Dependabot settings and pull request template
