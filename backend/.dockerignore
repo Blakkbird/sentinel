@@ -1,0 +1,7 @@
+# Keeps the build context small and stops local build output from leaking into the image.
+target/
+.mvn/
+mvnw
+mvnw.cmd
+*.iml
+.idea/
